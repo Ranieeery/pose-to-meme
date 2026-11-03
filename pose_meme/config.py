@@ -79,6 +79,14 @@ class DataConfig:
 
 
 @dataclass(frozen=True)
+class UiConfig:
+    window_title: str
+    quit_key: str
+    skeleton_key: str
+    fps_window: int
+
+
+@dataclass(frozen=True)
 class AppConfig:
     camera: CameraConfig
     tracker: TrackerConfig
@@ -88,6 +96,7 @@ class AppConfig:
     memes: MemesConfig
     renderer: RendererConfig
     data: DataConfig
+    ui: UiConfig
 
 
 def load_config(path: Path | str) -> AppConfig:
@@ -149,8 +158,12 @@ def _require(where: str, value: Any, is_valid: bool, expected: str) -> Any:
 
 
 def _validate(config: AppConfig) -> None:
-    camera, tracker, poses = config.camera, config.tracker, config.poses
+    camera, tracker, poses, ui = config.camera, config.tracker, config.poses, config.ui
     checks = [
+        ("ui.quit_key", ui.quit_key, len(ui.quit_key) == 1, "a single character"),
+        ("ui.skeleton_key", ui.skeleton_key, len(ui.skeleton_key) == 1, "a single character"),
+        ("ui.skeleton_key", ui.skeleton_key, ui.skeleton_key != ui.quit_key, "different from ui.quit_key"),
+        ("ui.fps_window", ui.fps_window, ui.fps_window >= 2, ">= 2"),
         ("camera.index", camera.index, camera.index >= 0, ">= 0"),
         ("camera.width", camera.width, camera.width > 0, "> 0"),
         ("camera.height", camera.height, camera.height > 0, "> 0"),

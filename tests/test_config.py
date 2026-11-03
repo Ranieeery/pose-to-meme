@@ -21,6 +21,7 @@ VALID: dict[str, Any] = {
     "memes": {"dir": "imgs", "cache_dir": "cache", "clip_model": "fake", "min_similarity": 0.1},
     "renderer": {"meme_height_ratio": 0.5, "show_skeleton": False},
     "data": {"samples_dir": "samples", "reports_dir": "out"},
+    "ui": {"window_title": "test", "quit_key": "x", "skeleton_key": "y", "fps_window": 5},
 }
 
 
@@ -57,6 +58,7 @@ def test_repo_config_has_the_documented_defaults() -> None:
     }
     assert config.memes.clip_model == "clip-ViT-B-32"
     assert config.renderer.meme_height_ratio == 0.4
+    assert config.ui.quit_key == "q"
 
 
 def test_values_are_loaded_into_typed_sections(tmp_path: Path) -> None:
@@ -184,6 +186,11 @@ def test_wrong_type_is_rejected(tmp_path: Path, section: str, key: str, value: A
         ("memes", "min_similarity", -1.5),
         ("renderer", "meme_height_ratio", 0),
         ("renderer", "meme_height_ratio", 1.1),
+        ("ui", "quit_key", "quit"),
+        ("ui", "quit_key", ""),
+        ("ui", "skeleton_key", "ab"),
+        ("ui", "skeleton_key", "x"),  # same key as quit_key
+        ("ui", "fps_window", 1),
     ],
 )
 def test_out_of_range_value_is_rejected(tmp_path: Path, section: str, key: str, value: Any) -> None:

@@ -44,3 +44,9 @@ renderer:
 data:
   samples_dir: data/samples
   reports_dir: reports
+
+ui:
+  window_title: meme-pose
+  quit_key: q
+  skeleton_key: s
+  fps_window: 30 # frames averaged by the FPS counter
