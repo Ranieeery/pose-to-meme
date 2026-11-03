@@ -1,0 +1,10 @@
+mediapipe==1.2.2
+# Required by mediapipe and provides `cv2`. Do not add opencv-python: it ships
+# the same package and the two overwrite each other.
+opencv-contrib-python==5.0.0.93
+numpy==2.5.4
+scikit-learn==1.9.1
+joblib==1.6.0
+sentence-transformers==6.2.0
+pyyaml==6.0.3
+pytest==9.2.0

@@ -1,0 +1,17 @@
+# Environment
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Generated data (folders are kept through .gitkeep)
+data/cache/*
+!data/cache/.gitkeep
+data/samples/*
+!data/samples/.gitkeep
+
+# Models: trained locally or downloaded (see README)
+models/*.joblib
+models/*.task
