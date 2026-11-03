@@ -1,0 +1,46 @@
+# Single source of truth for thresholds and paths.
+# Every key is required; relative paths are resolved against this file's folder.
+
+camera:
+  index: 0
+  width: 640
+  height: 480
+  mirror: true
+
+tracker:
+  model_variant: full # lite | full | heavy
+  model_dir: models
+  num_poses: 1
+  min_visibility: 0.5
+
+classifier:
+  model_path: models/pose_clf.joblib
+  confidence_threshold: 0.8
+
+stabilizer:
+  window_size: 8 # frames
+  min_ratio: 0.7 # share of the window a class needs for the pose to change
+
+poses:
+  neutral_class: neutro # never shows a meme, so it has no prompt
+  prompts:
+    mao_na_boca: "a person with one hand touching their mouth, finger on the lips"
+    maos_na_boca: "a person covering their mouth with both hands pressed together"
+    dedo_levantado: "a person raising one index finger in the air, making a point"
+    apontando_para_si: "a person pointing a finger at their own face, asking who, me?"
+    maos_para_frente: "a person reaching both open hands toward the camera with fingers spread"
+    mao_no_peito: "a person with one hand resting on their chest"
+
+memes:
+  dir: memes
+  cache_dir: data/cache
+  clip_model: clip-ViT-B-32
+  min_similarity: 0.2 # provisional; calibrate against real memes in M4
+
+renderer:
+  meme_height_ratio: 0.4 # share of the frame height
+  show_skeleton: true
+
+data:
+  samples_dir: data/samples
+  reports_dir: reports
