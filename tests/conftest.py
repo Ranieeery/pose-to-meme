@@ -77,6 +77,50 @@ def build_pose(overrides: Mapping[int, Point] | None = None, visibility: Mapping
     ]
 
 
+HAND_LANDMARKS = 21
+FINGER_BASES = {"thumb": 1, "index": 5, "middle": 9, "ring": 13, "pinky": 17}
+OPEN_HAND = ("thumb", "index", "middle", "ring", "pinky")
+POINTING_HAND = ("index",)
+ROCK_HAND = ("index", "pinky")
+
+
+def build_hand(
+    wrist: Point,
+    direction: Point = (0.0, -1.0),
+    size: float = 0.1,
+    extended: tuple[str, ...] = OPEN_HAND,
+    spread: float = 1.0,
+) -> Pose:
+    """Build the 21 landmarks of a hand; wrist to extended fingertip measures 1.1 * size.
+
+    direction is a unit vector from the wrist to the fingers. Fingers not listed in
+    extended fold back toward the palm, as in a real fist. spread is how many times
+    wider the fingertips are than the knuckles: 1 for parallel fingers.
+    """
+    dx, dy = direction
+    perpendicular = (-dy, dx)
+    points: list[Landmark] = [Landmark(*wrist)] * HAND_LANDMARKS
+
+    def at(along: float, across: float) -> Landmark:
+        return Landmark(
+            wrist[0] + size * (dx * along + perpendicular[0] * across),
+            wrist[1] + size * (dy * along + perpendicular[1] * across),
+        )
+
+    for position, (finger, base) in enumerate(FINGER_BASES.items()):
+        across = (position - 2) * 0.25
+        alongs = (0.5, 0.7, 0.9, 1.1) if finger in extended else (0.5, 0.65, 0.55, 0.45)
+        for joint, along in enumerate(alongs):
+            fan = 1.0 + (spread - 1.0) * joint / 3
+            points[base + joint] = at(along, across * fan)
+    return points
+
+
+@pytest.fixture
+def make_hand() -> Callable[..., Pose]:
+    return build_hand
+
+
 @pytest.fixture
 def make_pose() -> Callable[..., Pose]:
     """Factory for custom poses, e.g. to lower the visibility of one landmark."""
@@ -90,7 +134,7 @@ def neutral_pose() -> Pose:
 
 @pytest.fixture
 def hand_on_mouth_pose() -> Pose:
-    """mao_na_boca: one hand at the mouth."""
+    """A hand at the mouth; open or closed depends on the detected fingers."""
     return build_pose(_right_arm((0.40, 0.52), (0.49, 0.30)))
 
 
@@ -109,12 +153,12 @@ def finger_up_pose() -> Pose:
 @pytest.fixture
 def pointing_at_self_pose() -> Pose:
     """apontando_para_si: hand beside the face, index finger pointing at it."""
-    return build_pose(_right_arm((0.30, 0.42), (0.36, 0.28), index=(0.44, 0.27)))
+    return build_pose(_right_arm((0.25, 0.42), (0.30, 0.28), index=(0.40, 0.27)))
 
 
 @pytest.fixture
 def hands_forward_pose() -> Pose:
-    """maos_para_frente: both open hands reaching out, wider than the shoulders."""
+    """Both hands reaching out, wider than the shoulders; open or claws depends on the fingers."""
     return build_pose({**_left_arm((0.70, 0.50), (0.80, 0.42)), **_right_arm((0.30, 0.50), (0.20, 0.42))})
 
 
