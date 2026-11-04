@@ -1,5 +1,6 @@
 """Frame loop: only wires the pose_meme modules together."""
 
+import random
 import sys
 import time
 from pathlib import Path
@@ -7,10 +8,19 @@ from pathlib import Path
 import cv2
 
 from pose_meme.capture import Camera, CameraError
+from pose_meme.classifier import RuleClassifier, classify_frame
 from pose_meme.config import AppConfig, ConfigError, load_config
-from pose_meme.renderer import draw_hud, draw_skeleton
+from pose_meme.features import extract_features
+from pose_meme.meme_index import MemeLoadError, MemeSelector, load_static_memes
+from pose_meme.renderer import draw_body, draw_hud, overlay_centered
+from pose_meme.stabilizer import PoseStabilizer
 from pose_meme.timing import FpsCounter
-from pose_meme.tracker import POSE_CONNECTIONS, ModelNotFoundError, create_tracker
+from pose_meme.tracker import (
+    HAND_CONNECTIONS,
+    POSE_CONNECTIONS,
+    ModelNotFoundError,
+    create_body_tracker,
+)
 
 CONFIG_PATH = Path(__file__).resolve().parent / "config.yaml"
 KEY_WAIT_MS = 1
@@ -19,19 +29,40 @@ KEY_MASK = 0xFF
 
 def run(config: AppConfig) -> None:
     title = config.ui.window_title
+    neutral = config.poses.neutral_class
+    min_visibility = config.tracker.min_visibility
     show_skeleton = config.renderer.show_skeleton
     fps = FpsCounter(config.ui.fps_window)
+    classifier = RuleClassifier(config.rules, neutral)
+    stabilizer = PoseStabilizer(config.stabilizer.window_size, config.stabilizer.min_ratio, initial=neutral)
 
-    with Camera(config.camera) as camera, create_tracker(config.tracker) as tracker:
+    with Camera(config.camera) as camera, create_body_tracker(config.tracker, config.hand_tracker) as tracker:
+        frame = camera.read()
+        height, width = frame.shape[:2]  # whatever the camera delivers, not what was requested
+        memes = load_static_memes(config.memes, (height, width), config.renderer.meme_height_ratio)
+        selector = MemeSelector(memes, neutral, random.Random())
+
         try:
             while True:
                 frame = camera.read()
-                landmarks = tracker.detect(frame)
+                body = tracker.detect(frame)
+                features = (
+                    extract_features(body.pose, body.hands, width / height, min_visibility)
+                    if body.pose is not None
+                    else None
+                )
+                label, confidence = classify_frame(
+                    classifier, features, config.classifier.confidence_threshold, neutral
+                )
+                pose = stabilizer.update(label)
+                meme = selector.update(pose)
                 fps.tick(time.perf_counter())
 
-                if show_skeleton and landmarks is not None:
-                    draw_skeleton(frame, landmarks, POSE_CONNECTIONS, config.tracker.min_visibility)
-                draw_hud(frame, fps.fps)
+                if show_skeleton:
+                    draw_body(frame, body.pose, body.hands, POSE_CONNECTIONS, HAND_CONNECTIONS, min_visibility)
+                if meme is not None:
+                    overlay_centered(frame, meme)
+                draw_hud(frame, fps.fps, pose, confidence)
                 cv2.imshow(title, frame)
 
                 key = cv2.waitKey(KEY_WAIT_MS) & KEY_MASK
@@ -46,7 +77,7 @@ def run(config: AppConfig) -> None:
 def main() -> None:
     try:
         run(load_config(CONFIG_PATH))
-    except (ConfigError, CameraError, ModelNotFoundError) as error:
+    except (ConfigError, CameraError, ModelNotFoundError, MemeLoadError) as error:
         sys.exit(f"error: {error}")
 
 
