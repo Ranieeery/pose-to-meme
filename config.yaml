@@ -13,9 +13,32 @@ tracker:
   num_poses: 1
   min_visibility: 0.5
 
+hand_tracker:
+  model_path: models/hand_landmarker.task
+  num_hands: 2
+  min_detection_confidence: 0.5 # finding a new hand; lower invites false hands
+  min_presence_confidence: 0.3 # keeping a hand already found
+  min_tracking_confidence: 0.3
+  hold_frames: 3 # keep the last hands through losses this short
+
 classifier:
   model_path: models/pose_clf.joblib
   confidence_threshold: 0.8
+
+# RuleClassifier thresholds. Distances are in shoulder widths, as in features.py.
+rules:
+  mouth_radius: 0.4 # a hand point this close to the nose is at the mouth
+  mouth_radius_without_fingers: 0.55 # undetected hand: pose points stop at the knuckles
+  self_point_min_radius: 0.25 # fingertip closer to the nose than this is touching the mouth
+  self_point_max_radius: 0.6 # fingertip farther than this isn't pointing at the face
+  pointing_min_horizontal_ratio: 1.5 # a finger pointing at the face goes sideways, not up
+  finger_extended_ratio: 1.1 # tip vs. middle joint distance from the wrist; measured 1.25+ straight, 0.82- curled
+  open_hand_min_fingers: 4 # long fingers extended for a hand to count as open
+  open_hand_min_spread: 2.0 # fingertips vs. knuckles width; measured 3.05 spread, 1.2-1.9 relaxed
+  forward_hand_min_palm: 0.35 # wrist to palm center of a hand near the camera
+  forward_hands_min_gap: 0.8 # between palm centers; hands pressed together stay at the mouth rule
+  chest_half_width: 0.7
+  chest_max_depth: 1.2 # how far below the shoulder line the chest goes
 
 stabilizer:
   window_size: 8 # frames
@@ -24,18 +47,31 @@ stabilizer:
 poses:
   neutral_class: neutro # never shows a meme, so it has no prompt
   prompts:
-    mao_na_boca: "a person with one hand touching their mouth, finger on the lips"
+    mao_fechada_na_boca: "a person with a closed hand on their mouth, finger on the lips, thinking"
+    mao_aberta_na_boca: "a person holding an open hand in front of their mouth, showing their fingernails"
     maos_na_boca: "a person covering their mouth with both hands pressed together"
     dedo_levantado: "a person raising one index finger in the air, making a point"
     apontando_para_si: "a person pointing a finger at their own face, asking who, me?"
-    maos_para_frente: "a person reaching both open hands toward the camera with fingers spread"
-    mao_no_peito: "a person with one hand resting on their chest"
+    sinal_de_rock: "a person making the rock and roll devil horns hand sign"
+    maos_abertas_para_frente: "a person reaching both open hands toward the camera with fingers spread wide"
+    garras_para_frente: "a person reaching toward the camera with curled fingers like claws, screaming"
+    mao_no_peito: "a person with one hand resting on their chest or arm"
 
 memes:
   dir: memes
   cache_dir: data/cache
   clip_model: clip-ViT-B-32
   min_similarity: 0.2 # provisional; calibrate against real memes in M4
+  static_map: # temporary; CLIP matching replaces it in M4
+    mao_fechada_na_boca: [bebe-pensativo.webp, macaco-dedo-boca.webp]
+    mao_aberta_na_boca: [maria-joaquina-unha.webp]
+    maos_na_boca: [bjork-pose.jpg]
+    dedo_levantado: [lily-nerd.webp]
+    apontando_para_si: [ryujin-eu.webp]
+    sinal_de_rock: [licurgo-rock.webp]
+    maos_abertas_para_frente: [numetal-pose.jpg]
+    garras_para_frente: [ozzy-osbourne.jpg]
+    mao_no_peito: [valverde-pose.webp]
 
 renderer:
   meme_height_ratio: 0.4 # share of the frame height

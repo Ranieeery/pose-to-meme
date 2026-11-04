@@ -6,7 +6,7 @@ defaults: a missing key is an error rather than a second default hidden in code.
 
 from dataclasses import dataclass, fields, is_dataclass
 from pathlib import Path
-from typing import Any, TypeVar, get_type_hints
+from typing import Any, TypeVar, get_args, get_type_hints
 
 import yaml
 
@@ -14,6 +14,7 @@ T = TypeVar("T")
 
 MODEL_VARIANTS = ("lite", "full", "heavy")
 MODEL_FILE_TEMPLATE = "pose_landmarker_{variant}.task"
+LONG_FINGERS = 4  # all but the thumb
 
 
 class ConfigError(ValueError):
@@ -41,9 +42,37 @@ class TrackerConfig:
 
 
 @dataclass(frozen=True)
+class HandTrackerConfig:
+    model_path: Path
+    num_hands: int
+    min_detection_confidence: float
+    min_presence_confidence: float
+    min_tracking_confidence: float
+    hold_frames: int
+
+
+@dataclass(frozen=True)
 class ClassifierConfig:
     model_path: Path
     confidence_threshold: float
+
+
+@dataclass(frozen=True)
+class RulesConfig:
+    """RuleClassifier thresholds; distances are in body units (shoulder widths)."""
+
+    mouth_radius: float
+    mouth_radius_without_fingers: float
+    self_point_min_radius: float
+    self_point_max_radius: float
+    pointing_min_horizontal_ratio: float
+    finger_extended_ratio: float
+    open_hand_min_fingers: int
+    open_hand_min_spread: float
+    forward_hand_min_palm: float
+    forward_hands_min_gap: float
+    chest_half_width: float
+    chest_max_depth: float
 
 
 @dataclass(frozen=True)
@@ -64,6 +93,7 @@ class MemesConfig:
     cache_dir: Path
     clip_model: str
     min_similarity: float
+    static_map: dict[str, list[str]]
 
 
 @dataclass(frozen=True)
@@ -90,7 +120,9 @@ class UiConfig:
 class AppConfig:
     camera: CameraConfig
     tracker: TrackerConfig
+    hand_tracker: HandTrackerConfig
     classifier: ClassifierConfig
+    rules: RulesConfig
     stabilizer: StabilizerConfig
     poses: PosesConfig
     memes: MemesConfig
@@ -144,11 +176,17 @@ def _parse_value(expected: Any, value: Any, where: str, base_dir: Path) -> Any:
     if expected is str:
         return _require(where, value, isinstance(value, str), "a string")
 
-    # The only remaining annotation is dict[str, str].
-    is_text_mapping = isinstance(value, dict) and all(
-        isinstance(key, str) and isinstance(text, str) for key, text in value.items()
+    # The remaining annotations are dict[str, str] and dict[str, list[str]].
+    if get_args(expected)[1] is str:
+        is_text_mapping = isinstance(value, dict) and all(
+            isinstance(key, str) and isinstance(text, str) for key, text in value.items()
+        )
+        return _require(where, value, is_text_mapping, "a mapping of strings to strings")
+    is_list_mapping = isinstance(value, dict) and all(
+        isinstance(key, str) and isinstance(items, list) and all(isinstance(item, str) for item in items)
+        for key, items in value.items()
     )
-    return _require(where, value, is_text_mapping, "a mapping of strings to strings")
+    return _require(where, value, is_list_mapping, "a mapping of strings to lists of strings")
 
 
 def _require(where: str, value: Any, is_valid: bool, expected: str) -> Any:
@@ -159,7 +197,62 @@ def _require(where: str, value: Any, is_valid: bool, expected: str) -> Any:
 
 def _validate(config: AppConfig) -> None:
     camera, tracker, poses, ui = config.camera, config.tracker, config.poses, config.ui
+    rules, static_map, hand = config.rules, config.memes.static_map, config.hand_tracker
     checks = [
+        ("hand_tracker.num_hands", hand.num_hands, hand.num_hands >= 1, ">= 1"),
+        (
+            "hand_tracker.min_detection_confidence",
+            hand.min_detection_confidence,
+            0 <= hand.min_detection_confidence <= 1,
+            "in [0, 1]",
+        ),
+        (
+            "hand_tracker.min_presence_confidence",
+            hand.min_presence_confidence,
+            0 <= hand.min_presence_confidence <= 1,
+            "in [0, 1]",
+        ),
+        (
+            "hand_tracker.min_tracking_confidence",
+            hand.min_tracking_confidence,
+            0 <= hand.min_tracking_confidence <= 1,
+            "in [0, 1]",
+        ),
+        ("hand_tracker.hold_frames", hand.hold_frames, hand.hold_frames >= 0, ">= 0"),
+        ("rules.mouth_radius", rules.mouth_radius, rules.mouth_radius > 0, "> 0"),
+        (
+            "rules.mouth_radius_without_fingers",
+            rules.mouth_radius_without_fingers,
+            rules.mouth_radius_without_fingers > 0,
+            "> 0",
+        ),
+        ("rules.self_point_min_radius", rules.self_point_min_radius, rules.self_point_min_radius >= 0, ">= 0"),
+        (
+            "rules.self_point_max_radius",
+            rules.self_point_max_radius,
+            rules.self_point_max_radius > rules.self_point_min_radius,
+            "above rules.self_point_min_radius",
+        ),
+        (
+            "rules.pointing_min_horizontal_ratio",
+            rules.pointing_min_horizontal_ratio,
+            rules.pointing_min_horizontal_ratio > 0,
+            "> 0",
+        ),
+        ("rules.finger_extended_ratio", rules.finger_extended_ratio, rules.finger_extended_ratio >= 1, ">= 1"),
+        (
+            "rules.open_hand_min_fingers",
+            rules.open_hand_min_fingers,
+            1 <= rules.open_hand_min_fingers <= LONG_FINGERS,
+            f"in [1, {LONG_FINGERS}]",
+        ),
+        ("rules.open_hand_min_spread", rules.open_hand_min_spread, rules.open_hand_min_spread > 0, "> 0"),
+        ("rules.forward_hand_min_palm", rules.forward_hand_min_palm, rules.forward_hand_min_palm > 0, "> 0"),
+        ("rules.forward_hands_min_gap", rules.forward_hands_min_gap, rules.forward_hands_min_gap > 0, "> 0"),
+        ("rules.chest_half_width", rules.chest_half_width, rules.chest_half_width > 0, "> 0"),
+        ("rules.chest_max_depth", rules.chest_max_depth, rules.chest_max_depth > 0, "> 0"),
+        ("memes.static_map", static_map, static_map.keys() <= poses.prompts.keys(), "only classes in poses.prompts"),
+        ("memes.static_map", static_map, all(static_map.values()), "at least one file per class"),
         ("ui.quit_key", ui.quit_key, len(ui.quit_key) == 1, "a single character"),
         ("ui.skeleton_key", ui.skeleton_key, len(ui.skeleton_key) == 1, "a single character"),
         ("ui.skeleton_key", ui.skeleton_key, ui.skeleton_key != ui.quit_key, "different from ui.quit_key"),

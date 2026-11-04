@@ -15,10 +15,38 @@ REPO_CONFIG = Path(__file__).resolve().parent.parent / "config.yaml"
 VALID: dict[str, Any] = {
     "camera": {"index": 1, "width": 320, "height": 240, "mirror": False},
     "tracker": {"model_variant": "lite", "model_dir": "m", "num_poses": 1, "min_visibility": 0.25},
+    "hand_tracker": {
+        "model_path": "m/hand.task",
+        "num_hands": 1,
+        "min_detection_confidence": 0.6,
+        "min_presence_confidence": 0.6,
+        "min_tracking_confidence": 0.6,
+        "hold_frames": 1,
+    },
     "classifier": {"model_path": "m/clf.joblib", "confidence_threshold": 0.5},
+    "rules": {
+        "mouth_radius": 0.1,
+        "mouth_radius_without_fingers": 0.15,
+        "self_point_min_radius": 0.1,
+        "self_point_max_radius": 0.2,
+        "pointing_min_horizontal_ratio": 2.0,
+        "finger_extended_ratio": 1.5,
+        "open_hand_min_fingers": 3,
+        "open_hand_min_spread": 1.5,
+        "forward_hand_min_palm": 0.3,
+        "forward_hands_min_gap": 0.5,
+        "chest_half_width": 0.4,
+        "chest_max_depth": 0.5,
+    },
     "stabilizer": {"window_size": 4, "min_ratio": 0.5},
     "poses": {"neutral_class": "neutro", "prompts": {"maos_na_cabeca": "hands on head"}},
-    "memes": {"dir": "imgs", "cache_dir": "cache", "clip_model": "fake", "min_similarity": 0.1},
+    "memes": {
+        "dir": "imgs",
+        "cache_dir": "cache",
+        "clip_model": "fake",
+        "min_similarity": 0.1,
+        "static_map": {"maos_na_cabeca": ["a.png", "b.png"]},
+    },
     "renderer": {"meme_height_ratio": 0.5, "show_skeleton": False},
     "data": {"samples_dir": "samples", "reports_dir": "out"},
     "ui": {"window_title": "test", "quit_key": "x", "skeleton_key": "y", "fps_window": 5},
@@ -49,16 +77,24 @@ def test_repo_config_has_the_documented_defaults() -> None:
     assert config.stabilizer.min_ratio == 0.7
     assert config.poses.neutral_class == "neutro"
     assert set(config.poses.prompts) == {
-        "mao_na_boca",
+        "mao_fechada_na_boca",
+        "mao_aberta_na_boca",
         "maos_na_boca",
         "dedo_levantado",
         "apontando_para_si",
-        "maos_para_frente",
+        "sinal_de_rock",
+        "maos_abertas_para_frente",
+        "garras_para_frente",
         "mao_no_peito",
     }
     assert config.memes.clip_model == "clip-ViT-B-32"
     assert config.renderer.meme_height_ratio == 0.4
     assert config.ui.quit_key == "q"
+    assert config.hand_tracker.num_hands == 2
+    assert config.hand_tracker.model_path == REPO_CONFIG.parent / "models" / "hand_landmarker.task"
+    assert set(config.memes.static_map) == set(config.poses.prompts)
+    mapped = {name for names in config.memes.static_map.values() for name in names}
+    assert all((config.memes.dir / name).is_file() for name in mapped)
 
 
 def test_values_are_loaded_into_typed_sections(tmp_path: Path) -> None:
@@ -162,6 +198,8 @@ def test_unknown_key_is_rejected_to_catch_typos(tmp_path: Path) -> None:
         ("memes", "clip_model", 3),
         ("poses", "prompts", "hands on head"),
         ("poses", "prompts", {"maos_na_cabeca": 1}),
+        ("memes", "static_map", {"maos_na_cabeca": "a.png"}),
+        ("memes", "static_map", {"maos_na_cabeca": [1]}),
     ],
 )
 def test_wrong_type_is_rejected(tmp_path: Path, section: str, key: str, value: Any) -> None:
@@ -186,6 +224,26 @@ def test_wrong_type_is_rejected(tmp_path: Path, section: str, key: str, value: A
         ("memes", "min_similarity", -1.5),
         ("renderer", "meme_height_ratio", 0),
         ("renderer", "meme_height_ratio", 1.1),
+        ("hand_tracker", "num_hands", 0),
+        ("hand_tracker", "min_detection_confidence", 1.5),
+        ("hand_tracker", "min_presence_confidence", -0.1),
+        ("hand_tracker", "min_tracking_confidence", 1.5),
+        ("hand_tracker", "hold_frames", -1),
+        ("rules", "mouth_radius", 0),
+        ("rules", "mouth_radius_without_fingers", 0),
+        ("rules", "self_point_min_radius", -1),
+        ("rules", "self_point_max_radius", 0.05),  # below self_point_min_radius
+        ("rules", "pointing_min_horizontal_ratio", 0),
+        ("rules", "finger_extended_ratio", 0.5),
+        ("rules", "open_hand_min_fingers", 0),
+        ("rules", "open_hand_min_fingers", 5),
+        ("rules", "open_hand_min_spread", 0),
+        ("rules", "forward_hand_min_palm", 0),
+        ("rules", "forward_hands_min_gap", 0),
+        ("rules", "chest_half_width", 0),
+        ("rules", "chest_max_depth", 0),
+        ("memes", "static_map", {"unknown_pose": ["a.png"]}),
+        ("memes", "static_map", {"maos_na_cabeca": []}),
         ("ui", "quit_key", "quit"),
         ("ui", "quit_key", ""),
         ("ui", "skeleton_key", "ab"),
