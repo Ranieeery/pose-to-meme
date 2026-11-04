@@ -24,7 +24,7 @@ meme-pose/
 ├── pose_meme/
 │   ├── config.py           # carrega e valida o config.yaml em dataclasses tipadas
 │   ├── capture.py          # wrapper da webcam (OpenCV)
-│   ├── tracker.py          # MediaPipe PoseLandmarker → lista de landmarks
+│   ├── tracker.py          # MediaPipe PoseLandmarker e HandLandmarker → landmarks
 │   ├── features.py         # landmarks → vetor de features (ÚNICA fonte de verdade)
 │   ├── classifier.py       # interface PoseClassifier + RuleClassifier + MLClassifier
 │   ├── stabilizer.py       # debounce por janela/maioria
@@ -38,7 +38,7 @@ meme-pose/
 ├── data/
 │   ├── samples/            # sessao_XX.csv (features + label + session_id)
 │   └── cache/              # embeddings .npy + buckets.json (gerados, não versionar)
-├── models/                 # pose_landmarker_{lite,full,heavy}.task, pose_clf.joblib
+├── models/                 # pose_landmarker_{lite,full,heavy}.task, hand_landmarker.task, pose_clf.joblib
 ├── memes/                  # imagens (PNG com alpha preferível)
 ├── tests/
 └── docs/
@@ -50,13 +50,18 @@ meme-pose/
 ### Tracking
 - Usar a **API de Tasks do MediaPipe** (`mediapipe.tasks.python.vision.PoseLandmarker`, arquivo `.task`). **Não usar `mp.solutions`**, que é legado; tutoriais antigos usam essa API.
 - Modelo `lite`/`full`/`heavy` configurável no `config.yaml`; padrão `full`.
-- `num_poses=1`, captura em **640x480**, frame espelhado (`cv2.flip(frame, 1)`).
+- `num_poses=1`, frame espelhado (`cv2.flip(frame, 1)`).
+- O app pede **640x480**, mas usa o tamanho que a câmera entregar (câmeras virtuais podem ignorar o pedido), sem cortar o frame. Nada no pipeline pode assumir um tamanho ou proporção fixos.
+- Pose e mãos rodam em paralelo: em sequência, os dois modelos passam do orçamento de um frame a 30 FPS.
 - Ignorar landmarks com `visibility` abaixo do threshold configurado.
+- Dedos: `HandLandmarker` da mesma API (`hand_landmarker.task`, `num_hands=2`), porque o `PoseLandmarker` não distingue os dedos (só tem 3 pontos por mão).
 
 ### Features
 - `features.py` é **compartilhado entre coleta, treino e inferência**. Nunca recalcular features de outro jeito em outro lugar (evita training-serving skew).
-- Pontos do tronco superior (nariz, ombros, cotovelos, punhos, mãos), coordenadas x/y.
-- Normalização: transladar para o centro dos ombros e dividir pela distância entre ombros. As features precisam ser invariantes a posição no quadro e distância da câmera.
+- Pontos do tronco superior (nariz, ombros, cotovelos, punhos, mãos) e os 21 pontos de cada mão, coordenadas x/y.
+- Mão não detectada não invalida a amostra: o vetor mantém o tamanho fixo e carrega um indicador de presença por mão. Mãos perto do rosto costumam falhar, e as features de pose continuam valendo.
+- Cada mão é associada ao braço pelo punho da pose mais próximo, não pelo rótulo de lateralidade do modelo, que é pouco confiável em frame espelhado.
+- Normalização: corrigir x pela proporção do frame (largura/altura), porque o MediaPipe normaliza cada eixo separadamente; depois, transladar para o centro dos ombros e dividir pela distância entre ombros. As features precisam ser invariantes a posição no quadro, distância da câmera e proporção do frame.
 - Lembrar que no MediaPipe **y cresce para baixo**.
 
 ### Classificação
@@ -87,7 +92,7 @@ meme-pose/
 - HUD com FPS, pose atual e confiança; esqueleto desenhável on/off por tecla.
 
 ### Desempenho
-- Orçamento por frame: tracking é o gargalo; classificação e render devem ser desprezíveis.
+- Orçamento por frame: tracking (pose + mãos) é o gargalo; classificação e render devem ser desprezíveis.
 - `timing.py` mede tempo por etapa; os números vão para uma tabela no README.
 
 ## Testes
@@ -96,7 +101,7 @@ meme-pose/
 - **Testes unitários não dependem de webcam, de arquivos `.task` nem do download do CLIP.** Use landmarks sintéticos (objetos com `x`, `y`, `visibility`) e encoders falsos.
 - Testes que precisam de modelo real ou câmera ficam marcados com `@pytest.mark.integration` e são pulados por padrão.
 - O que deve estar coberto:
-  - `features`: invariância a translação e escala; tamanho fixo do vetor; tratamento de landmarks com baixa visibilidade.
+  - `features`: invariância a translação, escala e proporção do frame; tamanho fixo do vetor; tratamento de landmarks com baixa visibilidade; mão ausente; associação de cada mão ao braço correto.
   - `classifier`: regras do `RuleClassifier` em poses sintéticas; `MLClassifier` com modelo minúsculo treinado no próprio teste; threshold de confiança e classe `neutro`.
   - `stabilizer`: não troca de pose por ruído de 1–2 frames; troca quando a maioria se sustenta.
   - Split por sessão: nenhuma `session_id` aparece em treino e teste ao mesmo tempo.
