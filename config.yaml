@@ -47,7 +47,7 @@ stabilizer:
 poses:
   neutral_class: neutro # never shows a meme, so it has no prompt
   prompts:
-    mao_fechada_na_boca: "a person with a closed hand on their mouth, finger on the lips, thinking"
+    mao_fechada_na_boca: "a person with curled fingers bunched against their mouth, as if eating"
     mao_aberta_na_boca: "a person holding an open hand in front of their mouth, showing their fingernails"
     maos_na_boca: "a person covering their mouth with both hands pressed together"
     dedo_levantado: "a person raising one index finger in the air, making a point"
@@ -56,6 +56,7 @@ poses:
     maos_abertas_para_frente: "a person reaching both open hands toward the camera with fingers spread wide"
     garras_para_frente: "a person reaching toward the camera with curled fingers like claws, screaming"
     mao_no_peito: "a person with one hand resting on their chest or arm"
+    dedo_na_boca: "a person thoughtfully touching their lips with one finger"
 
 memes:
   dir: memes
@@ -63,7 +64,8 @@ memes:
   clip_model: clip-ViT-B-32
   min_similarity: 0.2 # provisional; calibrate against real memes in M4
   static_map: # temporary; CLIP matching replaces it in M4
-    mao_fechada_na_boca: [bebe-pensativo.webp, macaco-dedo-boca.webp]
+    mao_fechada_na_boca: [bebe-pensativo.webp]
+    dedo_na_boca: [macaco-dedo-boca.webp]
     mao_aberta_na_boca: [maria-joaquina-unha.webp]
     maos_na_boca: [bjork-pose.jpg]
     dedo_levantado: [lily-nerd.webp]
@@ -86,3 +88,18 @@ ui:
   quit_key: q
   skeleton_key: s
   fps_window: 30 # frames averaged by the FPS counter
+
+collect:
+  samples_per_class: 200 # per session; recording stops by itself here
+  sample_every: 2 # consecutive frames are nearly identical
+  countdown_seconds: 3 # time to get into the pose, so the movement isn't labeled as the pose
+  record_key: " "
+  class_keys: "0123456789a" # by position: the neutral class, then poses.prompts in order
+
+training:
+  hidden_layers: [64, 32]
+  alpha: 0.001
+  max_iter: 500
+  knn_neighbors: 5
+  random_seed: 42
+  min_sessions: 2 # one to train on and another to test on

@@ -6,7 +6,7 @@ defaults: a missing key is an error rather than a second default hidden in code.
 
 from dataclasses import dataclass, fields, is_dataclass
 from pathlib import Path
-from typing import Any, TypeVar, get_args, get_type_hints
+from typing import Any, TypeVar, get_args, get_origin, get_type_hints
 
 import yaml
 
@@ -117,6 +117,25 @@ class UiConfig:
 
 
 @dataclass(frozen=True)
+class CollectConfig:
+    samples_per_class: int
+    sample_every: int
+    countdown_seconds: float
+    record_key: str
+    class_keys: str
+
+
+@dataclass(frozen=True)
+class TrainingConfig:
+    hidden_layers: list[int]
+    alpha: float
+    max_iter: int
+    knn_neighbors: int
+    random_seed: int
+    min_sessions: int
+
+
+@dataclass(frozen=True)
 class AppConfig:
     camera: CameraConfig
     tracker: TrackerConfig
@@ -129,6 +148,8 @@ class AppConfig:
     renderer: RendererConfig
     data: DataConfig
     ui: UiConfig
+    collect: CollectConfig
+    training: TrainingConfig
 
 
 def load_config(path: Path | str) -> AppConfig:
@@ -176,6 +197,12 @@ def _parse_value(expected: Any, value: Any, where: str, base_dir: Path) -> Any:
     if expected is str:
         return _require(where, value, isinstance(value, str), "a string")
 
+    if get_origin(expected) is list:
+        is_int_list = isinstance(value, list) and all(
+            isinstance(item, int) and not isinstance(item, bool) for item in value
+        )
+        return _require(where, value, is_int_list, "a list of integers")
+
     # The remaining annotations are dict[str, str] and dict[str, list[str]].
     if get_args(expected)[1] is str:
         is_text_mapping = isinstance(value, dict) and all(
@@ -198,7 +225,52 @@ def _require(where: str, value: Any, is_valid: bool, expected: str) -> Any:
 def _validate(config: AppConfig) -> None:
     camera, tracker, poses, ui = config.camera, config.tracker, config.poses, config.ui
     rules, static_map, hand = config.rules, config.memes.static_map, config.hand_tracker
+    collect, training = config.collect, config.training
     checks = [
+        (
+            "collect.class_keys",
+            collect.class_keys,
+            len(collect.class_keys) >= len(poses.prompts) + 1,
+            "one key per class, including the neutral class",
+        ),
+        (
+            "collect.class_keys",
+            collect.class_keys,
+            len(set(collect.class_keys)) == len(collect.class_keys),
+            "no repeated keys",
+        ),
+        (
+            "collect.class_keys",
+            collect.class_keys,
+            not {ui.quit_key, ui.skeleton_key} & set(collect.class_keys),
+            "different from the ui keys",
+        ),
+        ("collect.samples_per_class", collect.samples_per_class, collect.samples_per_class >= 1, ">= 1"),
+        ("collect.sample_every", collect.sample_every, collect.sample_every >= 1, ">= 1"),
+        ("collect.countdown_seconds", collect.countdown_seconds, collect.countdown_seconds >= 0, ">= 0"),
+        ("collect.record_key", collect.record_key, len(collect.record_key) == 1, "a single character"),
+        (
+            "collect.record_key",
+            collect.record_key,
+            collect.record_key not in collect.class_keys,
+            "not one of collect.class_keys",
+        ),
+        (
+            "collect.record_key",
+            collect.record_key,
+            collect.record_key not in (ui.quit_key, ui.skeleton_key),
+            "different from the ui keys",
+        ),
+        (
+            "training.hidden_layers",
+            training.hidden_layers,
+            bool(training.hidden_layers) and all(size > 0 for size in training.hidden_layers),
+            "a non-empty list of positive sizes",
+        ),
+        ("training.alpha", training.alpha, training.alpha >= 0, ">= 0"),
+        ("training.max_iter", training.max_iter, training.max_iter >= 1, ">= 1"),
+        ("training.knn_neighbors", training.knn_neighbors, training.knn_neighbors >= 1, ">= 1"),
+        ("training.min_sessions", training.min_sessions, training.min_sessions >= 2, ">= 2"),
         ("hand_tracker.num_hands", hand.num_hands, hand.num_hands >= 1, ">= 1"),
         (
             "hand_tracker.min_detection_confidence",

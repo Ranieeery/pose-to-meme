@@ -50,6 +50,21 @@ VALID: dict[str, Any] = {
     "renderer": {"meme_height_ratio": 0.5, "show_skeleton": False},
     "data": {"samples_dir": "samples", "reports_dir": "out"},
     "ui": {"window_title": "test", "quit_key": "x", "skeleton_key": "y", "fps_window": 5},
+    "collect": {
+        "samples_per_class": 10,
+        "sample_every": 1,
+        "countdown_seconds": 0.5,
+        "record_key": "r",
+        "class_keys": "0123",
+    },
+    "training": {
+        "hidden_layers": [8, 4],
+        "alpha": 0.01,
+        "max_iter": 50,
+        "knn_neighbors": 3,
+        "random_seed": 1,
+        "min_sessions": 3,
+    },
 }
 
 
@@ -78,6 +93,7 @@ def test_repo_config_has_the_documented_defaults() -> None:
     assert config.poses.neutral_class == "neutro"
     assert set(config.poses.prompts) == {
         "mao_fechada_na_boca",
+        "dedo_na_boca",
         "mao_aberta_na_boca",
         "maos_na_boca",
         "dedo_levantado",
@@ -90,6 +106,8 @@ def test_repo_config_has_the_documented_defaults() -> None:
     assert config.memes.clip_model == "clip-ViT-B-32"
     assert config.renderer.meme_height_ratio == 0.4
     assert config.ui.quit_key == "q"
+    assert config.training.min_sessions >= 2
+    assert all(isinstance(size, int) for size in config.training.hidden_layers)
     assert config.hand_tracker.num_hands == 2
     assert config.hand_tracker.model_path == REPO_CONFIG.parent / "models" / "hand_landmarker.task"
     assert set(config.memes.static_map) == set(config.poses.prompts)
@@ -200,6 +218,9 @@ def test_unknown_key_is_rejected_to_catch_typos(tmp_path: Path) -> None:
         ("poses", "prompts", {"maos_na_cabeca": 1}),
         ("memes", "static_map", {"maos_na_cabeca": "a.png"}),
         ("memes", "static_map", {"maos_na_cabeca": [1]}),
+        ("training", "hidden_layers", 8),
+        ("training", "hidden_layers", ["8"]),
+        ("training", "hidden_layers", [True]),
     ],
 )
 def test_wrong_type_is_rejected(tmp_path: Path, section: str, key: str, value: Any) -> None:
@@ -244,6 +265,23 @@ def test_wrong_type_is_rejected(tmp_path: Path, section: str, key: str, value: A
         ("rules", "chest_max_depth", 0),
         ("memes", "static_map", {"unknown_pose": ["a.png"]}),
         ("memes", "static_map", {"maos_na_cabeca": []}),
+        ("collect", "samples_per_class", 0),
+        ("collect", "sample_every", 0),
+        ("collect", "countdown_seconds", -1),
+        ("collect", "record_key", "ab"),
+        ("collect", "record_key", "3"),  # this key chooses a class
+        ("collect", "record_key", "x"),  # same key as ui.quit_key
+        ("collect", "record_key", "y"),  # same key as ui.skeleton_key
+        ("collect", "class_keys", "0"),  # fewer keys than classes
+        ("collect", "class_keys", "00"),  # the same key for two classes
+        ("collect", "class_keys", "0x"),  # same key as ui.quit_key
+        ("collect", "class_keys", "0y"),  # same key as ui.skeleton_key
+        ("training", "hidden_layers", []),
+        ("training", "hidden_layers", [0]),
+        ("training", "alpha", -1),
+        ("training", "max_iter", 0),
+        ("training", "knn_neighbors", 0),
+        ("training", "min_sessions", 1),
         ("ui", "quit_key", "quit"),
         ("ui", "quit_key", ""),
         ("ui", "skeleton_key", "ab"),
@@ -259,6 +297,21 @@ def test_out_of_range_value_is_rejected(tmp_path: Path, section: str, key: str, 
 def test_prompts_cannot_be_empty(tmp_path: Path) -> None:
     with pytest.raises(ConfigError, match=r"poses\.prompts"):
         load_config(write_config(tmp_path, with_value("poses", "prompts", {})))
+
+
+def test_more_classes_than_collect_keys_are_rejected(tmp_path: Path) -> None:
+    prompts = {f"pose_{index}": "prompt" for index in range(4)}  # plus the neutral class: 5 for 4 keys
+    data = with_value("poses", "prompts", prompts)
+    data["memes"]["static_map"] = {}
+
+    with pytest.raises(ConfigError, match=r"collect\.class_keys"):
+        load_config(write_config(tmp_path, data))
+
+
+def test_repo_config_has_a_collect_key_for_every_class() -> None:
+    config = load_config(REPO_CONFIG)
+
+    assert len(config.collect.class_keys) >= len(config.poses.prompts) + 1
 
 
 def test_neutral_class_cannot_have_a_prompt(tmp_path: Path) -> None:
