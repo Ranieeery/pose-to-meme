@@ -40,6 +40,9 @@ rules:
   chest_half_width: 0.7
   chest_max_depth: 1.2 # how far below the shoulder line the chest goes
   hands_together_max_gap: 0.6 # between wrists; measured 0.30-0.42 with palms together, 1.0+ with one hand at the mouth
+  head_min_height: 0.35 # top of the hand above the nose; measured 0.58 with hands on the head
+  head_half_width: 0.8 # hand center to the nose, sideways; measured 0.5 with hands on the head
+  tie_max_crossing: -0.1 # palm past the body center; measured -0.18 on the tie, -0.04 to 0.33 holding the other arm
 
 stabilizer:
   window_size: 8 # frames
@@ -58,6 +61,8 @@ poses:
     garras_para_frente: "a person reaching toward the camera with curled fingers like claws, screaming"
     mao_no_ombro: "a person with one hand across their body, holding their opposite shoulder or upper arm"
     dedo_na_boca: "a person thoughtfully touching their lips with one finger"
+    maos_na_cabeca: "a person screaming with their mouth open and both hands on their head"
+    mao_na_gravata: "a smiling person in a suit adjusting their tie or lapel with one hand on their chest"
 
 memes:
   dir: memes
@@ -67,6 +72,8 @@ memes:
   static_map: # temporary; CLIP matching replaces it in M4
     mao_fechada_na_boca: [bebe-pensativo.webp]
     dedo_na_boca: [macaco-dedo-boca.webp]
+    maos_na_cabeca: [aaaaaaaaaaaaaa.jpg]
+    mao_na_gravata: [trajado.jpg]
     mao_aberta_na_boca: [maria-joaquina-unha.webp]
     maos_unidas: [bjork-pose.jpg]
     dedo_levantado: [lily-nerd.webp]
@@ -95,7 +102,7 @@ collect:
   sample_every: 2 # consecutive frames are nearly identical
   countdown_seconds: 3 # time to get into the pose, so the movement isn't labeled as the pose
   record_key: " "
-  class_keys: "0123456789a" # by position: the neutral class, then poses.prompts in order
+  class_keys: "0123456789abc" # by position: the neutral class, then poses.prompts in order
 
 training:
   hidden_layers: [64, 32]

@@ -20,6 +20,8 @@ POSE_CLASSES = (
     "garras_para_frente",
     "mao_no_ombro",
     "dedo_na_boca",
+    "maos_na_cabeca",
+    "mao_na_gravata",
 )
 
 # Rules either match or don't, so they carry no graded confidence.
@@ -118,7 +120,10 @@ class RuleClassifier:
     def _label(self, view: FeatureView) -> str:
         # Order matters: finger gestures also place a hand near the face or the chest,
         # so the specific ones must be checked before the generic position rules. Hands
-        # toward the camera come first, since big open fingers can cross the mouth area.
+        # toward the camera come first, since big open fingers can cross the mouth area,
+        # and only hands on the head come before them, as these look big and apart too.
+        if all(self._is_on_head(view, side) for side in SIDES):
+            return "maos_na_cabeca"
         left, right = (view.hand(side) for side in SIDES)
         if left is not None and right is not None and self._are_toward_camera(left, right):
             spread_open = self._is_spread_open(left) and self._is_spread_open(right)
@@ -134,9 +139,29 @@ class RuleClassifier:
             return "dedo_levantado"
         if sides_at_mouth:
             return self._mouth_class(view.hand(sides_at_mouth[0]))
-        if any(self._is_on_chest(view, side) for side in SIDES):
-            return "mao_no_ombro"
+        sides_on_chest = [side for side in SIDES if self._is_on_chest(view, side)]
+        if sides_on_chest:
+            on_tie = all(self._stays_on_its_side(view, side) for side in sides_on_chest)
+            return "mao_na_gravata" if on_tie else "mao_no_ombro"
         return self._neutral
+
+    def _is_on_head(self, view: FeatureView, side: str) -> bool:
+        nose = view.point("nose")
+        points = self._hand_points(view, side)
+        if nose is None or len(points) == 0:
+            return False
+        return bool(
+            points[:, 1].min() < nose[1] - self._rules.head_min_height
+            and abs(points[:, 0].mean() - nose[0]) < self._rules.head_half_width
+        )
+
+    def _stays_on_its_side(self, view: FeatureView, side: str) -> bool:
+        """A palm short of the body center; reaching the other arm takes it past the center."""
+        hand, shoulder = view.hand(side), view.point(f"{side}_shoulder")
+        if hand is None or shoulder is None:
+            return False
+        crossing = -np.sign(shoulder[0]) * hand[PALM_CENTER][0]
+        return bool(crossing < self._rules.tie_max_crossing)
 
     def _wrists_together(self, view: FeatureView) -> bool:
         """Palms pressed together read as one hand, so only the pose wrists show the other one."""

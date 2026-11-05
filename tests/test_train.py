@@ -40,6 +40,9 @@ RULES = RulesConfig(
     chest_half_width=0.7,
     chest_max_depth=1.2,
     hands_together_max_gap=0.6,
+    head_min_height=0.35,
+    head_half_width=0.8,
+    tie_max_crossing=-0.1,
 )
 CLASSES = ["neutro", "pose_a", "pose_b"]
 

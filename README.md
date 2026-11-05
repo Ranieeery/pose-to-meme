@@ -46,7 +46,7 @@ python -m scripts.collect
 
 | Tecla | Ação |
 |---|---|
-| `0` a `9`, `a` | escolhe a classe (`0` é `neutro`); a tela mostra a tecla de cada uma |
+| `0` a `9`, `a` a `c` | escolhe a classe (`0` é `neutro`); a tela mostra a tecla de cada uma |
 | espaço | inicia a contagem e grava; de novo, para |
 | `s` | liga/desliga o esqueleto |
 | `q` | fecha e encerra a sessão |

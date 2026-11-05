@@ -37,6 +37,9 @@ RULES = RulesConfig(
     chest_half_width=0.7,
     chest_max_depth=1.2,
     hands_together_max_gap=0.6,
+    head_min_height=0.35,
+    head_half_width=0.8,
+    tie_max_crossing=-0.1,
 )
 UP = (0.0, -1.0)
 RIGHT = (1.0, 0.0)
@@ -296,11 +299,90 @@ def test_hand_on_the_chest_works_with_the_other_arm(hand_on_chest_pose) -> None:
 
 def test_detected_hand_on_the_chest_counts_by_the_palm_not_the_wrist(make_pose) -> None:
     # valverde-pose: the forearm comes from the side, so the wrist is out of the chest
-    # while the palm rests on it.
-    pose = make_pose({16: (0.28, 0.55), 14: (0.15, 0.55)})
-    hand = build_hand((0.28, 0.55), RIGHT, size=0.2)
+    # while the palm rests on it, past the center of the body.
+    pose = make_pose({16: (0.32, 0.55), 14: (0.15, 0.55)})
+    hand = build_hand((0.32, 0.55), RIGHT, size=0.4)
 
     assert classify(pose, [hand])[0] == "mao_no_ombro"
+
+
+# Hand on the tie, on its own side of the chest (trajado)
+
+
+def test_hand_on_its_own_side_of_the_chest_is_on_the_tie(make_pose) -> None:
+    pose = make_pose({16: (0.42, 0.60)})
+    hand = build_hand((0.42, 0.60), UP)
+
+    assert classify(pose, [hand])[0] == "mao_na_gravata"
+
+
+def test_hand_on_the_tie_works_with_the_other_arm(make_pose) -> None:
+    pose = make_pose({15: (0.58, 0.60)})
+    hand = build_hand((0.58, 0.60), UP)
+
+    assert classify(pose, [hand])[0] == "mao_na_gravata"
+
+
+def test_hand_crossing_the_center_of_the_body_is_on_the_shoulder(make_pose) -> None:
+    pose = make_pose({16: (0.52, 0.60)})
+    hand = build_hand((0.52, 0.60), UP)
+
+    assert classify(pose, [hand])[0] == "mao_no_ombro"
+
+
+def test_crossing_hand_wins_over_the_other_hand_resting_on_its_side(make_pose) -> None:
+    pose = make_pose({16: (0.52, 0.60), 15: (0.62, 0.60)})
+    hands = [build_hand((0.52, 0.60), UP), build_hand((0.62, 0.60), UP)]
+
+    assert classify(pose, hands)[0] == "mao_no_ombro"
+
+
+def test_undetected_hand_on_the_chest_cannot_be_the_tie(hand_on_chest_pose) -> None:
+    # Telling them apart takes the palm, which only the hand model gives.
+    assert classify(hand_on_chest_pose)[0] == "mao_no_ombro"
+
+
+# Both hands on the head (aaaaaaaaaaaaaa)
+
+
+def test_both_hands_on_the_head(make_pose) -> None:
+    pose = make_pose({16: (0.40, 0.20), 15: (0.60, 0.20)})
+    hands = [build_hand((0.40, 0.20), UP), build_hand((0.60, 0.20), UP)]
+
+    assert classify(pose, hands)[0] == "maos_na_cabeca"
+
+
+def test_big_hands_on_the_head_are_not_toward_the_camera(make_pose) -> None:
+    # The meme read as open hands: close to the camera, palms look big and stay apart.
+    pose = make_pose({16: (0.40, 0.20), 15: (0.60, 0.20)})
+    hands = [build_hand((0.40, 0.20), UP, size=0.15), build_hand((0.60, 0.20), UP, size=0.15)]
+
+    assert classify(pose, hands)[0] == "maos_na_cabeca"
+
+
+def test_hands_on_the_head_without_finger_tracking(make_pose) -> None:
+    pose = make_pose({16: (0.42, 0.18), 20: (0.42, 0.12), 15: (0.58, 0.18), 19: (0.58, 0.12)})
+
+    assert classify(pose)[0] == "maos_na_cabeca"
+
+
+def test_one_hand_on_the_head_is_not_both_hands(make_pose) -> None:
+    pose = make_pose({16: (0.40, 0.20)})
+
+    assert classify(pose, [build_hand((0.40, 0.20), UP)])[0] != "maos_na_cabeca"
+
+
+def test_hands_raised_far_from_the_head_are_not_on_it(make_pose) -> None:
+    pose = make_pose({16: (0.15, 0.20), 15: (0.85, 0.20)})
+    hands = [build_hand((0.15, 0.20), UP), build_hand((0.85, 0.20), UP)]
+
+    assert classify(pose, hands)[0] != "maos_na_cabeca"
+
+
+def test_hands_reaching_forward_below_the_top_of_the_head_are_not_on_it(hands_forward_pose) -> None:
+    hands = [build_hand((0.80, 0.42), UP, size=0.15), build_hand((0.20, 0.42), UP, size=0.15)]
+
+    assert classify(hands_forward_pose, hands)[0] != "maos_na_cabeca"
 
 
 def test_hidden_arm_is_ignored_instead_of_read_as_a_position(make_pose) -> None:

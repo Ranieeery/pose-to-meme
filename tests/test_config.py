@@ -38,6 +38,9 @@ VALID: dict[str, Any] = {
         "chest_half_width": 0.4,
         "chest_max_depth": 0.5,
         "hands_together_max_gap": 0.4,
+        "head_min_height": 0.2,
+        "head_half_width": 0.5,
+        "tie_max_crossing": 0.0,
     },
     "stabilizer": {"window_size": 4, "min_ratio": 0.5},
     "poses": {"neutral_class": "neutro", "prompts": {"maos_na_cabeca": "hands on head"}},
@@ -103,6 +106,8 @@ def test_repo_config_has_the_documented_defaults() -> None:
         "maos_abertas_para_frente",
         "garras_para_frente",
         "mao_no_ombro",
+        "maos_na_cabeca",
+        "mao_na_gravata",
     }
     assert config.memes.clip_model == "clip-ViT-B-32"
     assert config.renderer.meme_height_ratio == 0.4
@@ -265,6 +270,8 @@ def test_wrong_type_is_rejected(tmp_path: Path, section: str, key: str, value: A
         ("rules", "chest_half_width", 0),
         ("rules", "chest_max_depth", 0),
         ("rules", "hands_together_max_gap", 0),
+        ("rules", "head_min_height", 0),
+        ("rules", "head_half_width", 0),
         ("memes", "static_map", {"unknown_pose": ["a.png"]}),
         ("memes", "static_map", {"maos_na_cabeca": []}),
         ("collect", "samples_per_class", 0),

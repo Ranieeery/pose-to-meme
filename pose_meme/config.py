@@ -74,6 +74,9 @@ class RulesConfig:
     chest_half_width: float
     chest_max_depth: float
     hands_together_max_gap: float
+    head_min_height: float
+    head_half_width: float
+    tie_max_crossing: float
 
 
 @dataclass(frozen=True)
@@ -325,6 +328,8 @@ def _validate(config: AppConfig) -> None:
         ("rules.chest_half_width", rules.chest_half_width, rules.chest_half_width > 0, "> 0"),
         ("rules.chest_max_depth", rules.chest_max_depth, rules.chest_max_depth > 0, "> 0"),
         ("rules.hands_together_max_gap", rules.hands_together_max_gap, rules.hands_together_max_gap > 0, "> 0"),
+        ("rules.head_min_height", rules.head_min_height, rules.head_min_height > 0, "> 0"),
+        ("rules.head_half_width", rules.head_half_width, rules.head_half_width > 0, "> 0"),
         ("memes.static_map", static_map, static_map.keys() <= poses.prompts.keys(), "only classes in poses.prompts"),
         ("memes.static_map", static_map, all(static_map.values()), "at least one file per class"),
         ("ui.quit_key", ui.quit_key, len(ui.quit_key) == 1, "a single character"),
