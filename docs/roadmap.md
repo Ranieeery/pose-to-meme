@@ -19,6 +19,7 @@ Itens fora do escopo do MVP. Marque `[x]` quando implementado e mova para "Concl
 - [ ] **Pose extraída dos próprios memes**: rodar o PoseLandmarker nas imagens da pasta; quando houver pessoa detectável, usar o vetor de pose do meme para matching por vizinho mais próximo com a pose do usuário, com fallback para o CLIP.
 - [ ] **Rotulagem automática com LLM multimodal**: na indexação, um LLM descreve cada meme e sugere a classe/prompt; resultado em cache. Documentar custo e latência.
 - [ ] **Gestos de mão** com Hand Landmarker (joinha, apontar, dedo no queixo) combinados às features de pose. _Antecipado para o M2._
+- [ ] **Aumento de dados por espelhamento**: inverter x e trocar esquerda/direita nas features de treino, para poses de uma mão generalizarem para a outra sem gravar as duas. Só no treino, nunca nas sessões de teste.
 - [ ] **CI no GitHub Actions** rodando `pytest` (sem os testes `integration`).
 - [ ] **GIF de demonstração** no README.
 

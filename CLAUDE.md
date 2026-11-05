@@ -26,6 +26,7 @@ meme-pose/
 │   ├── capture.py          # wrapper da webcam (OpenCV)
 │   ├── tracker.py          # MediaPipe PoseLandmarker e HandLandmarker → landmarks
 │   ├── features.py         # landmarks → vetor de features (ÚNICA fonte de verdade)
+│   ├── dataset.py          # CSV de amostras por sessão e controle da gravação
 │   ├── classifier.py       # interface PoseClassifier + RuleClassifier + MLClassifier
 │   ├── stabilizer.py       # debounce por janela/maioria
 │   ├── meme_index.py       # embeddings CLIP, cache, buckets classe → memes, sorteio
@@ -73,7 +74,9 @@ meme-pose/
 ### Dados e avaliação
 - Cada amostra carrega `session_id`. **Split de treino/teste sempre por sessão, nunca aleatório**: frames consecutivos são quase idênticos e o split aleatório vaza informação, inflando a acurácia.
 - Gravar sessões em condições diferentes (iluminação, roupa, distância).
-- `train.py` gera `classification_report`, matriz de confusão e comparação MLP vs KNN, salvos em `reports/`.
+- Avaliação por **leave-one-session-out**: cada sessão é testada uma vez por um modelo que nunca a viu, e as métricas somam todas elas. O modelo salvo é treinado depois com todas as sessões.
+- `train.py` gera `classification_report`, matriz de confusão e comparação MLP vs KNN vs regras, salvos em `reports/`.
+- O modelo salvo é sempre o MLP; o KNN e as regras são baselines, então a avaliação mede o modelo em vez de escolhê-lo.
 
 ### Estabilização
 - Janela deslizante (padrão 8 frames); a pose muda só quando uma classe atinge a proporção mínima (padrão 0.7).
