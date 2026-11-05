@@ -1,11 +1,24 @@
 from dataclasses import replace
 from pathlib import Path
 
+import joblib
+import numpy as np
 import pytest
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
 
-from pose_meme.classifier import POSE_CLASSES, RuleClassifier, accept_pose, classify_frame
+from pose_meme.classifier import (
+    POSE_CLASSES,
+    MLClassifier,
+    ModelLoadError,
+    RuleClassifier,
+    accept_pose,
+    classify_frame,
+    load_classifier,
+)
 from pose_meme.config import RulesConfig, load_config
-from pose_meme.features import extract_features
+from pose_meme.features import FEATURE_SIZE, extract_features
 from tests.conftest import POINTING_HAND, ROCK_HAND, build_hand
 
 REPO_CONFIG = Path(__file__).resolve().parent.parent / "config.yaml"
@@ -62,7 +75,7 @@ def test_one_open_hand_raised_beside_the_head_is_neutral(make_pose) -> None:
     assert classify(pose, [build_hand((0.25, 0.30), UP)])[0] == NEUTRAL
 
 
-# Hand on the mouth: closed (bebe-pensativo, macaco-dedo-boca) vs. open (maria-joaquina-unha)
+# Hand on the mouth: closed (bebe-pensativo), one finger (macaco-dedo-boca), open (maria-joaquina-unha)
 
 
 def test_hand_without_finger_tracking_on_the_mouth_counts_as_closed(hand_on_mouth_pose) -> None:
@@ -80,12 +93,19 @@ def test_fist_on_the_mouth_is_closed(make_pose) -> None:
     assert classify(pose, [fist])[0] == "mao_fechada_na_boca"
 
 
-def test_finger_up_on_the_lips_is_closed(make_pose) -> None:
-    # bebe-pensativo: the finger points up, but it is touching the mouth.
+def test_one_finger_up_on_the_lips_is_finger_on_mouth(make_pose) -> None:
+    # macaco-dedo-boca: the finger points up, but it is touching the mouth.
     pose = make_pose({16: (0.48, 0.40), 14: (0.40, 0.55)})
     hand = build_hand((0.48, 0.40), UP, size=0.12, extended=POINTING_HAND)
 
-    assert classify(pose, [hand])[0] == "mao_fechada_na_boca"
+    assert classify(pose, [hand])[0] == "dedo_na_boca"
+
+
+def test_finger_on_the_mouth_works_with_the_other_arm(make_pose) -> None:
+    pose = make_pose({16: (0.48, 0.40), 14: (0.40, 0.55)})
+    hand = build_hand((0.52, 0.40), UP, size=0.12, extended=POINTING_HAND)
+
+    assert classify(mirrored(pose), [hand])[0] == "dedo_na_boca"
 
 
 def test_open_hand_on_the_mouth_is_open(make_pose) -> None:
@@ -158,12 +178,12 @@ def test_pointing_away_from_the_face_is_not_pointing_at_self(pointing_at_self_po
     assert classify(pointing_at_self_pose, [hand])[0] != "apontando_para_si"
 
 
-def test_finger_touching_the_lips_sideways_is_closed_not_pointing(make_pose) -> None:
-    # The confusion seen on camera: macaco and bebe read as ryujin.
+def test_finger_touching_the_lips_sideways_is_not_pointing_at_self(make_pose) -> None:
+    # The confusion seen on camera: macaco read as ryujin.
     pose = make_pose({16: (0.38, 0.27), 14: (0.30, 0.45)})
     hand = build_hand((0.38, 0.27), RIGHT, extended=POINTING_HAND)  # tip about 0.13 from the nose
 
-    assert classify(pose, [hand])[0] == "mao_fechada_na_boca"
+    assert classify(pose, [hand])[0] == "dedo_na_boca"
 
 
 def test_finger_going_up_at_an_angle_is_not_pointing_at_self(make_pose) -> None:
@@ -273,6 +293,77 @@ def test_prediction_is_a_class_and_a_confidence(neutral_pose) -> None:
 
     assert isinstance(label, str)
     assert 0.0 <= confidence <= 1.0
+
+
+# MLClassifier: same interface, tiny model trained here
+
+
+def tiny_pipeline():
+    rng = np.random.default_rng(0)
+    features = np.vstack(
+        [rng.normal(center, 0.1, (20, FEATURE_SIZE)) for center in (-5.0, 5.0)],
+    )
+    labels = ["neutro"] * 20 + ["mao_no_peito"] * 20
+    return make_pipeline(StandardScaler(), KNeighborsClassifier(n_neighbors=3)).fit(features, labels)
+
+
+def test_ml_classifier_returns_the_class_and_its_probability() -> None:
+    label, confidence = MLClassifier(tiny_pipeline()).predict(np.full(FEATURE_SIZE, 5.0))
+
+    assert label == "mao_no_peito"
+    assert confidence == pytest.approx(1.0)
+
+
+def test_ml_classifier_confidence_varies_with_the_input() -> None:
+    # Unlike the rules, which is what makes the confidence threshold mean something.
+    rng = np.random.default_rng(0)
+    features = rng.normal(0.0, 1.0, (40, FEATURE_SIZE))
+    labels = ["neutro", "mao_no_peito"] * 20
+    pipeline = make_pipeline(StandardScaler(), KNeighborsClassifier(n_neighbors=5)).fit(features, labels)
+
+    confidences = {MLClassifier(pipeline).predict(rng.normal(0.0, 1.0, FEATURE_SIZE))[1] for _ in range(30)}
+
+    assert len(confidences) > 1
+
+
+def test_ml_classifier_goes_through_the_same_threshold() -> None:
+    classifier = MLClassifier(tiny_pipeline())
+
+    label, _ = classify_frame(classifier, np.full(FEATURE_SIZE, 5.0), threshold=1.1, neutral_class=NEUTRAL)
+
+    assert label == NEUTRAL
+
+
+def save_model(path: Path, feature_size: int = FEATURE_SIZE) -> None:
+    joblib.dump({"pipeline": tiny_pipeline(), "feature_size": feature_size}, path)
+
+
+def test_trained_model_is_used_when_it_exists(tmp_path: Path) -> None:
+    path = tmp_path / "clf.joblib"
+    save_model(path)
+
+    assert isinstance(load_classifier(path, RULES, NEUTRAL), MLClassifier)
+
+
+def test_rules_are_the_fallback_without_a_trained_model(tmp_path: Path) -> None:
+    assert isinstance(load_classifier(tmp_path / "nope.joblib", RULES, NEUTRAL), RuleClassifier)
+
+
+def test_model_from_another_feature_layout_is_an_error_not_a_silent_fallback(tmp_path: Path) -> None:
+    # Falling back here would hide that the model the user trained is not running.
+    path = tmp_path / "clf.joblib"
+    save_model(path, feature_size=3)
+
+    with pytest.raises(ModelLoadError, match="retrain|train"):
+        load_classifier(path, RULES, NEUTRAL)
+
+
+def test_unreadable_model_is_an_error(tmp_path: Path) -> None:
+    path = tmp_path / "clf.joblib"
+    path.write_bytes(b"not a model")
+
+    with pytest.raises(ModelLoadError):
+        load_classifier(path, RULES, NEUTRAL)
 
 
 def test_frame_without_features_is_neutral() -> None:

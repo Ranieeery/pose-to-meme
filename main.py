@@ -8,7 +8,7 @@ from pathlib import Path
 import cv2
 
 from pose_meme.capture import Camera, CameraError
-from pose_meme.classifier import RuleClassifier, classify_frame
+from pose_meme.classifier import ModelLoadError, classify_frame, load_classifier
 from pose_meme.config import AppConfig, ConfigError, load_config
 from pose_meme.features import extract_features
 from pose_meme.meme_index import MemeLoadError, MemeSelector, load_static_memes
@@ -33,7 +33,8 @@ def run(config: AppConfig) -> None:
     min_visibility = config.tracker.min_visibility
     show_skeleton = config.renderer.show_skeleton
     fps = FpsCounter(config.ui.fps_window)
-    classifier = RuleClassifier(config.rules, neutral)
+    classifier = load_classifier(config.classifier.model_path, config.rules, neutral)
+    print(f"classifier: {type(classifier).__name__}")
     stabilizer = PoseStabilizer(config.stabilizer.window_size, config.stabilizer.min_ratio, initial=neutral)
 
     with Camera(config.camera) as camera, create_body_tracker(config.tracker, config.hand_tracker) as tracker:
@@ -77,7 +78,7 @@ def run(config: AppConfig) -> None:
 def main() -> None:
     try:
         run(load_config(CONFIG_PATH))
-    except (ConfigError, CameraError, ModelNotFoundError, MemeLoadError) as error:
+    except (ConfigError, CameraError, ModelNotFoundError, MemeLoadError, ModelLoadError) as error:
         sys.exit(f"error: {error}")
 
 
