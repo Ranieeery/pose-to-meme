@@ -34,6 +34,33 @@ python main.py
 | `q` | fecha o app |
 | `s` | liga/desliga o esqueleto |
 
+## Treinar o classificador
+
+O app usa o modelo treinado em `models/pose_clf.joblib` se ele existir, e as regras geométricas se não existir.
+
+**1. Grave pelo menos duas sessões**, em condições diferentes (luz, roupa, distância):
+
+```powershell
+python -m scripts.collect
+```
+
+| Tecla | Ação |
+|---|---|
+| `0` a `9`, `a` | escolhe a classe (`0` é `neutro`); a tela mostra a tecla de cada uma |
+| espaço | inicia a contagem e grava; de novo, para |
+| `s` | liga/desliga o esqueleto |
+| `q` | fecha e encerra a sessão |
+
+A gravação para sozinha ao atingir `collect.samples_per_class` por classe. Cada execução cria uma nova sessão em `data/samples/`.
+
+**2. Avalie e treine:**
+
+```powershell
+python -m scripts.train
+```
+
+O relatório sai em `reports/report.md`. Cada sessão é testada por um modelo que não a viu, e o modelo salvo é treinado depois com todas elas.
+
 ## Testes
 
 ```powershell
