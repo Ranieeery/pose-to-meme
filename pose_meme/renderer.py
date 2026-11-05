@@ -80,8 +80,12 @@ def draw_body(
 
 
 def draw_hud(frame: np.ndarray, fps: float, pose: str, confidence: float) -> None:
+    draw_text_lines(frame, [f"FPS: {fps:.1f}", f"Pose: {pose}", f"Confianca: {confidence:.2f}"])
+
+
+def draw_text_lines(frame: np.ndarray, lines: Sequence[str]) -> None:
+    """Outlined text from the top left corner; cv2 fonts have no accented characters."""
     x, y = HUD_ORIGIN
-    lines = (f"FPS: {fps:.1f}", f"Pose: {pose}", f"Confianca: {confidence:.2f}")
     for number, text in enumerate(lines):
         origin = (x, y + number * HUD_LINE_HEIGHT)
         cv2.putText(frame, text, origin, HUD_FONT, HUD_SCALE, HUD_OUTLINE_COLOR, HUD_OUTLINE_THICKNESS, cv2.LINE_AA)

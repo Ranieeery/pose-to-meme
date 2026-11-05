@@ -1,7 +1,15 @@
 import numpy as np
 import pytest
 
-from pose_meme.renderer import draw_body, draw_hud, draw_skeleton, fit_overlay, overlay_centered
+from pose_meme.renderer import (
+    HUD_LINE_HEIGHT,
+    draw_body,
+    draw_hud,
+    draw_skeleton,
+    draw_text_lines,
+    fit_overlay,
+    overlay_centered,
+)
 from tests.conftest import (
     RIGHT_ELBOW,
     RIGHT_INDEX,
@@ -169,6 +177,15 @@ def test_hud_shows_each_value(first: dict, second: dict) -> None:
     draw_hud(other, **second)
 
     assert not np.array_equal(one, other)
+
+
+def test_text_lines_go_down_the_frame() -> None:
+    frame = np.zeros((200, 400, 3), np.uint8)
+
+    draw_text_lines(frame, ["first", "second", "third"])
+
+    lit_rows = np.nonzero(frame.any(axis=(1, 2)))[0]
+    assert lit_rows.max() - lit_rows.min() > 2 * HUD_LINE_HEIGHT - HUD_LINE_HEIGHT // 2
 
 
 def bgra(height: int, width: int, color: tuple[int, int, int], alpha: int) -> np.ndarray:
