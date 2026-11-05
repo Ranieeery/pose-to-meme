@@ -85,6 +85,20 @@ def validate_samples(
     return sorted(set(classes) - labels)
 
 
+def sessions_missing_classes(samples: Samples) -> dict[str, list[str]]:
+    """Classes each session lacks among those recorded in any session.
+
+    Evaluating on such a session is lopsided: a model trained only on a session with few
+    classes can't predict the others, so the metrics fall with no sign of why.
+    """
+    recorded = set(samples.labels.tolist())
+    missing = {
+        str(session): sorted(recorded - set(samples.labels[samples.sessions == session].tolist()))
+        for session in np.unique(samples.sessions)
+    }
+    return {session: classes for session, classes in missing.items() if classes}
+
+
 def _summarize(predictions: np.ndarray, confidences: np.ndarray, samples: Samples) -> SessionEvaluation:
     correct = predictions == samples.labels
     per_session = {
@@ -169,6 +183,12 @@ def _report_text(metrics: dict[str, Any], evaluations: dict[str, SessionEvaluati
         "Todas as métricas vêm de sessões que o modelo avaliado não viu (leave-one-session-out). "
         "As regras não são treinadas, então todas as sessões são inéditas para elas.",
         "",
+    ]
+    if incomplete := metrics["sessions_missing_classes"]:
+        lines += ["## Aviso: sessões incompletas", "", "Estas sessões distorcem as métricas. Classes ausentes:", ""]
+        lines += [f"- {session}: {', '.join(classes)}" for session, classes in incomplete.items()]
+        lines.append("")
+    lines += [
         "## Comparação",
         "",
         "| Classificador | Acurácia | F1 macro | Pior sessão | Acurácia após threshold "
@@ -227,6 +247,7 @@ def train_and_report(
         "sessions": sorted(set(samples.sessions.tolist())),
         "samples": len(samples.labels),
         "samples_per_class": dict(Counter(samples.labels.tolist())),
+        "sessions_missing_classes": sessions_missing_classes(samples),
         "classifiers": {
             name: _metrics(evaluation, samples, neutral_class, confidence_threshold, latencies[name])
             for name, evaluation in evaluations.items()
@@ -257,6 +278,8 @@ def main() -> None:
 
     if missing:
         print(f"warning: classes without samples, which the model won't learn: {missing}")
+    for session, classes in sessions_missing_classes(samples).items():
+        print(f"warning: {session} lacks {classes}, which distorts the metrics; consider recording it again")
     metrics = train_and_report(
         samples,
         config.training,

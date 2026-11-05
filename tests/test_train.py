@@ -14,6 +14,7 @@ from scripts.train import (
     evaluate_by_session,
     session_folds,
     train_and_report,
+    sessions_missing_classes,
     validate_samples,
 )
 
@@ -38,6 +39,7 @@ RULES = RulesConfig(
     forward_hands_min_gap=0.8,
     chest_half_width=0.7,
     chest_max_depth=1.2,
+    hands_together_max_gap=0.6,
 )
 CLASSES = ["neutro", "pose_a", "pose_b"]
 
@@ -138,6 +140,30 @@ def test_classes_without_samples_are_reported_not_fatal() -> None:
     assert validate_samples(make_samples(), [*CLASSES, "pose_c"], min_sessions=2) == ["pose_c"]
 
 
+def session_without(samples: Samples, session: str, label: str) -> Samples:
+    keep = ~((samples.sessions == session) & (samples.labels == label))
+    return Samples(samples.features[keep], samples.labels[keep], samples.sessions[keep])
+
+
+def test_complete_sessions_miss_nothing() -> None:
+    assert sessions_missing_classes(make_samples()) == {}
+
+
+def test_session_without_a_class_is_named_with_what_it_misses() -> None:
+    # A session with only the neutral class gave an accuracy of 12.6% with no explanation.
+    samples = session_without(session_without(make_samples(), "s2", "pose_a"), "s2", "pose_b")
+
+    assert sessions_missing_classes(samples) == {"s2": ["pose_a", "pose_b"]}
+
+
+def test_class_no_session_has_is_not_a_session_problem() -> None:
+    # Classes absent from all the data are what validate_samples already reports.
+    samples = make_samples()
+    keep = samples.labels != "pose_b"
+
+    assert sessions_missing_classes(Samples(samples.features[keep], samples.labels[keep], samples.sessions[keep])) == {}
+
+
 # Pipelines
 
 
@@ -192,6 +218,30 @@ def test_reports_are_written(trained) -> None:
     assert "precision" in text
     assert "Matriz de confus" in text
     assert json.loads((reports / "metrics.json").read_text(encoding="utf-8"))["sessions"] == ["s1", "s2", "s3"]
+
+
+def test_report_warns_about_incomplete_sessions(tmp_path: Path) -> None:
+    samples = session_without(make_samples(), "s2", "pose_a")
+
+    metrics = train_and_report(
+        samples,
+        TRAINING,
+        RULES,
+        neutral_class="neutro",
+        confidence_threshold=0.8,
+        model_path=tmp_path / "clf.joblib",
+        reports_dir=tmp_path,
+    )
+
+    assert metrics["sessions_missing_classes"] == {"s2": ["pose_a"]}
+    assert "s2: pose_a" in (tmp_path / "report.md").read_text(encoding="utf-8")
+
+
+def test_report_has_no_warning_with_complete_sessions(trained) -> None:
+    _, reports, metrics = trained
+
+    assert metrics["sessions_missing_classes"] == {}
+    assert "incompletas" not in (reports / "report.md").read_text(encoding="utf-8")
 
 
 def test_metrics_compare_the_three_classifiers(trained) -> None:
