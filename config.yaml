@@ -39,6 +39,7 @@ rules:
   forward_hands_min_gap: 0.8 # between palm centers; hands pressed together stay at the mouth rule
   chest_half_width: 0.7
   chest_max_depth: 1.2 # how far below the shoulder line the chest goes
+  hands_together_max_gap: 0.6 # between wrists; measured 0.30-0.42 with palms together, 1.0+ with one hand at the mouth
 
 stabilizer:
   window_size: 8 # frames
@@ -49,13 +50,13 @@ poses:
   prompts:
     mao_fechada_na_boca: "a person with curled fingers bunched against their mouth, as if eating"
     mao_aberta_na_boca: "a person holding an open hand in front of their mouth, showing their fingernails"
-    maos_na_boca: "a person covering their mouth with both hands pressed together"
+    maos_unidas: "a person with both palms pressed together in front of their face, as if praying"
     dedo_levantado: "a person raising one index finger in the air, making a point"
     apontando_para_si: "a person pointing a finger at their own face, asking who, me?"
     sinal_de_rock: "a person making the rock and roll devil horns hand sign"
     maos_abertas_para_frente: "a person reaching both open hands toward the camera with fingers spread wide"
     garras_para_frente: "a person reaching toward the camera with curled fingers like claws, screaming"
-    mao_no_peito: "a person with one hand resting on their chest or arm"
+    mao_no_ombro: "a person with one hand across their body, holding their opposite shoulder or upper arm"
     dedo_na_boca: "a person thoughtfully touching their lips with one finger"
 
 memes:
@@ -67,13 +68,13 @@ memes:
     mao_fechada_na_boca: [bebe-pensativo.webp]
     dedo_na_boca: [macaco-dedo-boca.webp]
     mao_aberta_na_boca: [maria-joaquina-unha.webp]
-    maos_na_boca: [bjork-pose.jpg]
+    maos_unidas: [bjork-pose.jpg]
     dedo_levantado: [lily-nerd.webp]
     apontando_para_si: [ryujin-eu.webp]
     sinal_de_rock: [licurgo-rock.webp]
     maos_abertas_para_frente: [numetal-pose.jpg]
     garras_para_frente: [ozzy-osbourne.jpg]
-    mao_no_peito: [valverde-pose.webp]
+    mao_no_ombro: [valverde-pose.webp]
 
 renderer:
   meme_height_ratio: 0.4 # share of the frame height

@@ -12,13 +12,13 @@ from pose_meme.features import FEATURE_SIZE, SIDES, FeatureView
 POSE_CLASSES = (
     "mao_fechada_na_boca",
     "mao_aberta_na_boca",
-    "maos_na_boca",
+    "maos_unidas",
     "dedo_levantado",
     "apontando_para_si",
     "sinal_de_rock",
     "maos_abertas_para_frente",
     "garras_para_frente",
-    "mao_no_peito",
+    "mao_no_ombro",
     "dedo_na_boca",
 )
 
@@ -124,8 +124,8 @@ class RuleClassifier:
             spread_open = self._is_spread_open(left) and self._is_spread_open(right)
             return "maos_abertas_para_frente" if spread_open else "garras_para_frente"
         sides_at_mouth = [side for side in SIDES if self._is_at_mouth(view, side)]
-        if len(sides_at_mouth) == len(SIDES):
-            return "maos_na_boca"
+        if len(sides_at_mouth) == len(SIDES) or (sides_at_mouth and self._wrists_together(view)):
+            return "maos_unidas"
         if any(self._is_rock_sign(view, side) for side in SIDES):
             return "sinal_de_rock"
         if any(self._points_at_self(view, side) for side in SIDES):
@@ -135,8 +135,15 @@ class RuleClassifier:
         if sides_at_mouth:
             return self._mouth_class(view.hand(sides_at_mouth[0]))
         if any(self._is_on_chest(view, side) for side in SIDES):
-            return "mao_no_peito"
+            return "mao_no_ombro"
         return self._neutral
+
+    def _wrists_together(self, view: FeatureView) -> bool:
+        """Palms pressed together read as one hand, so only the pose wrists show the other one."""
+        left, right = (view.point(f"{side}_wrist") for side in SIDES)
+        if left is None or right is None:
+            return False
+        return _distance(np.array(left), np.array(right)) <= self._rules.hands_together_max_gap
 
     def _mouth_class(self, hand: np.ndarray | None) -> str:
         # Without finger tracking there is no way to tell the fingers apart, so a hand

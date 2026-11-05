@@ -166,7 +166,7 @@ def test_hud_writes_on_the_frame_keeping_its_shape() -> None:
     ("first", "second"),
     [
         ({"fps": 10.0, "pose": "neutro", "confidence": 0.5}, {"fps": 88.0, "pose": "neutro", "confidence": 0.5}),
-        ({"fps": 10.0, "pose": "neutro", "confidence": 0.5}, {"fps": 10.0, "pose": "mao_no_peito", "confidence": 0.5}),
+        ({"fps": 10.0, "pose": "neutro", "confidence": 0.5}, {"fps": 10.0, "pose": "mao_no_ombro", "confidence": 0.5}),
         ({"fps": 10.0, "pose": "neutro", "confidence": 0.5}, {"fps": 10.0, "pose": "neutro", "confidence": 0.9}),
     ],
 )

@@ -140,7 +140,7 @@ def hand_on_mouth_pose() -> Pose:
 
 @pytest.fixture
 def hands_on_mouth_pose() -> Pose:
-    """maos_na_boca: both hands together over the mouth."""
+    """maos_unidas: both hands together over the mouth."""
     return build_pose({**_left_arm((0.56, 0.50), (0.52, 0.30)), **_right_arm((0.44, 0.50), (0.48, 0.30))})
 
 
@@ -164,5 +164,5 @@ def hands_forward_pose() -> Pose:
 
 @pytest.fixture
 def hand_on_chest_pose() -> Pose:
-    """mao_no_peito: one hand resting on the chest."""
+    """mao_no_ombro: one hand across the chest, toward the other shoulder or arm."""
     return build_pose(_right_arm((0.36, 0.55), (0.52, 0.47)))

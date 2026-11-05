@@ -2,7 +2,7 @@ from pose_meme.stabilizer import PoseStabilizer
 
 NEUTRAL = "neutro"
 POSE = "mao_na_boca"
-OTHER = "mao_no_peito"
+OTHER = "mao_no_ombro"
 
 
 def stabilizer(window_size: int = 8, min_ratio: float = 0.7) -> PoseStabilizer:

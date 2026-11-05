@@ -36,6 +36,7 @@ RULES = RulesConfig(
     forward_hands_min_gap=0.8,
     chest_half_width=0.7,
     chest_max_depth=1.2,
+    hands_together_max_gap=0.6,
 )
 UP = (0.0, -1.0)
 RIGHT = (1.0, 0.0)
@@ -127,7 +128,7 @@ def test_detected_fingers_do_not_get_the_wider_radius(make_pose) -> None:
 
 
 def test_both_hands_on_the_mouth(hands_on_mouth_pose) -> None:
-    assert classify(hands_on_mouth_pose)[0] == "maos_na_boca"
+    assert classify(hands_on_mouth_pose)[0] == "maos_unidas"
 
 
 def test_undetected_hands_reach_the_mouth_with_a_wider_radius(make_pose) -> None:
@@ -135,7 +136,31 @@ def test_undetected_hands_reach_the_mouth_with_a_wider_radius(make_pose) -> None
     # "index" point is a knuckle, so it stops short of the mouth (0.47 widths there).
     pose = make_pose({20: (0.42, 0.30), 19: (0.58, 0.30), 16: (0.46, 0.45), 15: (0.54, 0.45)})
 
-    assert classify(pose)[0] == "maos_na_boca"
+    assert classify(pose)[0] == "maos_unidas"
+
+
+def test_hands_together_read_as_one_hand_are_still_both_hands(make_pose) -> None:
+    # Measured on camera: palms pressed together give one detected hand in every frame,
+    # and only that hand reaches the mouth. The wrists, 0.30-0.42 apart, tell them apart.
+    pose = make_pose({16: (0.47, 0.40), 15: (0.53, 0.40)})
+    hand = build_hand((0.47, 0.40), UP, size=0.12)
+
+    assert classify(pose, [hand])[0] == "maos_unidas"
+
+
+def test_wrists_together_away_from_the_mouth_are_not_hands_together(make_pose) -> None:
+    # The hand holding the other arm also brings the wrists close, but far from the mouth.
+    pose = make_pose({16: (0.47, 0.60), 15: (0.53, 0.60)})
+    hand = build_hand((0.47, 0.60), RIGHT, size=0.1)
+
+    assert classify(pose, [hand])[0] == "mao_no_ombro"
+
+
+def test_one_hand_on_the_mouth_with_the_other_wrist_hidden_stays_one_hand(make_pose) -> None:
+    pose = make_pose({16: (0.47, 0.42), 14: (0.40, 0.55)}, visibility={15: 0.1, 17: 0.1, 19: 0.1, 21: 0.1})
+    hand = build_hand((0.47, 0.42), UP, size=0.13)
+
+    assert classify(pose, [hand])[0] == "mao_aberta_na_boca"
 
 
 # Raised finger (lily-nerd)
@@ -249,7 +274,7 @@ def test_big_hands_together_on_the_mouth_are_not_toward_the_camera(hands_on_mout
     # bjork-pose up close: big palms too, but pressed together instead of apart.
     hands = [build_hand((0.54, 0.42), UP, size=0.15), build_hand((0.46, 0.42), UP, size=0.15)]
 
-    assert classify(hands_on_mouth_pose, hands)[0] == "maos_na_boca"
+    assert classify(hands_on_mouth_pose, hands)[0] == "maos_unidas"
 
 
 def test_hands_toward_the_camera_need_both_hands(hands_forward_pose) -> None:
@@ -258,15 +283,15 @@ def test_hands_toward_the_camera_need_both_hands(hands_forward_pose) -> None:
     assert classify(hands_forward_pose, [hand])[0] not in ("maos_abertas_para_frente", "garras_para_frente")
 
 
-# Hand on the chest (valverde-pose)
+# Hand across the chest, holding the other shoulder or arm (valverde-pose)
 
 
 def test_hand_on_the_chest(hand_on_chest_pose) -> None:
-    assert classify(hand_on_chest_pose)[0] == "mao_no_peito"
+    assert classify(hand_on_chest_pose)[0] == "mao_no_ombro"
 
 
 def test_hand_on_the_chest_works_with_the_other_arm(hand_on_chest_pose) -> None:
-    assert classify(mirrored(hand_on_chest_pose))[0] == "mao_no_peito"
+    assert classify(mirrored(hand_on_chest_pose))[0] == "mao_no_ombro"
 
 
 def test_detected_hand_on_the_chest_counts_by_the_palm_not_the_wrist(make_pose) -> None:
@@ -275,7 +300,7 @@ def test_detected_hand_on_the_chest_counts_by_the_palm_not_the_wrist(make_pose) 
     pose = make_pose({16: (0.28, 0.55), 14: (0.15, 0.55)})
     hand = build_hand((0.28, 0.55), RIGHT, size=0.2)
 
-    assert classify(pose, [hand])[0] == "mao_no_peito"
+    assert classify(pose, [hand])[0] == "mao_no_ombro"
 
 
 def test_hidden_arm_is_ignored_instead_of_read_as_a_position(make_pose) -> None:
@@ -303,14 +328,14 @@ def tiny_pipeline():
     features = np.vstack(
         [rng.normal(center, 0.1, (20, FEATURE_SIZE)) for center in (-5.0, 5.0)],
     )
-    labels = ["neutro"] * 20 + ["mao_no_peito"] * 20
+    labels = ["neutro"] * 20 + ["mao_no_ombro"] * 20
     return make_pipeline(StandardScaler(), KNeighborsClassifier(n_neighbors=3)).fit(features, labels)
 
 
 def test_ml_classifier_returns_the_class_and_its_probability() -> None:
     label, confidence = MLClassifier(tiny_pipeline()).predict(np.full(FEATURE_SIZE, 5.0))
 
-    assert label == "mao_no_peito"
+    assert label == "mao_no_ombro"
     assert confidence == pytest.approx(1.0)
 
 
@@ -318,7 +343,7 @@ def test_ml_classifier_confidence_varies_with_the_input() -> None:
     # Unlike the rules, which is what makes the confidence threshold mean something.
     rng = np.random.default_rng(0)
     features = rng.normal(0.0, 1.0, (40, FEATURE_SIZE))
-    labels = ["neutro", "mao_no_peito"] * 20
+    labels = ["neutro", "mao_no_ombro"] * 20
     pipeline = make_pipeline(StandardScaler(), KNeighborsClassifier(n_neighbors=5)).fit(features, labels)
 
     confidences = {MLClassifier(pipeline).predict(rng.normal(0.0, 1.0, FEATURE_SIZE))[1] for _ in range(30)}
@@ -375,7 +400,7 @@ def test_frame_without_features_is_neutral() -> None:
 def test_frame_below_the_threshold_is_neutral_but_keeps_its_confidence(hand_on_chest_pose) -> None:
     class Unsure:
         def predict(self, features):
-            return "mao_no_peito", 0.5
+            return "mao_no_ombro", 0.5
 
     features = extract_features(hand_on_chest_pose, [], aspect_ratio=1.0, min_visibility=0.5)
 
@@ -385,9 +410,9 @@ def test_frame_below_the_threshold_is_neutral_but_keeps_its_confidence(hand_on_c
 @pytest.mark.parametrize(
     ("label", "confidence", "expected"),
     [
-        ("mao_no_peito", 0.9, "mao_no_peito"),
-        ("mao_no_peito", 0.8, "mao_no_peito"),
-        ("mao_no_peito", 0.79, NEUTRAL),
+        ("mao_no_ombro", 0.9, "mao_no_ombro"),
+        ("mao_no_ombro", 0.8, "mao_no_ombro"),
+        ("mao_no_ombro", 0.79, NEUTRAL),
         (NEUTRAL, 0.99, NEUTRAL),
     ],
 )
