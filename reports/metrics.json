@@ -1,0 +1,70 @@
+{
+  "sessions": [
+    "sessao_02",
+    "sessao_03",
+    "sessao_04"
+  ],
+  "samples": 7400,
+  "samples_per_class": {
+    "neutro": 600,
+    "mao_fechada_na_boca": 600,
+    "mao_aberta_na_boca": 600,
+    "maos_unidas": 600,
+    "dedo_levantado": 600,
+    "apontando_para_si": 600,
+    "sinal_de_rock": 600,
+    "maos_abertas_para_frente": 600,
+    "garras_para_frente": 600,
+    "mao_no_ombro": 600,
+    "dedo_na_boca": 600,
+    "maos_na_cabeca": 400,
+    "mao_na_gravata": 400
+  },
+  "sessions_missing_classes": {
+    "sessao_02": [
+      "mao_na_gravata",
+      "maos_na_cabeca"
+    ]
+  },
+  "classifiers": {
+    "mlp": {
+      "accuracy": 0.8741891891891892,
+      "macro_f1": 0.8715218094581628,
+      "accuracy_after_threshold": 0.8383783783783784,
+      "false_meme_rate": 0.15666666666666668,
+      "worst_session_accuracy": 0.7907692307692308,
+      "per_session": {
+        "sessao_02": 0.8909090909090909,
+        "sessao_03": 0.7907692307692308,
+        "sessao_04": 0.9434615384615385
+      },
+      "latency_ms": 0.28809999821532983
+    },
+    "knn": {
+      "accuracy": 0.7644594594594595,
+      "macro_f1": 0.7673776261534708,
+      "accuracy_after_threshold": 0.7436486486486487,
+      "false_meme_rate": 0.2633333333333333,
+      "worst_session_accuracy": 0.7072727272727273,
+      "per_session": {
+        "sessao_02": 0.7072727272727273,
+        "sessao_03": 0.7534615384615385,
+        "sessao_04": 0.8238461538461539
+      },
+      "latency_ms": 1.2795000002370216
+    },
+    "rules": {
+      "accuracy": 0.7195945945945946,
+      "macro_f1": 0.6877839263799035,
+      "accuracy_after_threshold": 0.7195945945945946,
+      "false_meme_rate": 0.255,
+      "worst_session_accuracy": 0.6726923076923077,
+      "per_session": {
+        "sessao_02": 0.7509090909090909,
+        "sessao_03": 0.6726923076923077,
+        "sessao_04": 0.74
+      },
+      "latency_ms": 0.025699999241624027
+    }
+  }
+}
