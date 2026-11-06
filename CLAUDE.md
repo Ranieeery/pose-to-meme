@@ -95,6 +95,7 @@ meme-pose/
 - Janela em duas colunas: a câmera à esquerda, sem nada por cima além do esqueleto, e um painel à direita (largura configurável, proporcional à da câmera) com as informações em cima e o meme embaixo.
 - O meme ocupa o maior tamanho que cabe na área do painel, centralizado, com alpha blending sobre o fundo do painel (carregar com `cv2.IMREAD_UNCHANGED`). Imagens sem alpha são coladas opacas.
 - Imagens pré-carregadas e redimensionadas uma vez na inicialização.
+- O painel com o meme (o alpha blending é a parte cara) é montado só quando o meme muda, e a imagem da janela é reaproveitada: por frame, só a câmera é copiada e a faixa de texto redesenhada.
 - **Nada é esticado:** a janela tem tamanho fixo (redimensionar a janela no Windows estica a imagem). Se câmera + painel passarem de `ui.max_window_width`, a câmera é reduzida por igual nos dois eixos antes de montar o painel.
 - Painel com pose atual, confiança e FPS; esqueleto desenhável on/off por tecla.
 
