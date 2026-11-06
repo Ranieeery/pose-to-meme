@@ -85,9 +85,10 @@ def draw_body(
         draw_skeleton(frame, hand, hand_connections, min_visibility)
 
 
-def info_lines(fps: float, pose: str, confidence: float) -> list[str]:
+def info_lines(fps: float, pose: str, confidence: float, sound_on: bool, sound_key: str) -> list[str]:
     """What the panel shows above the meme; always the same number of lines."""
-    return [f"Pose: {pose}", f"Confianca: {confidence:.2f}", f"FPS: {fps:.1f}"]
+    sound = "ligado" if sound_on else "desligado"
+    return [f"Pose: {pose}", f"Confianca: {confidence:.2f}", f"FPS: {fps:.1f}", f"Som: {sound} [{sound_key}]"]
 
 
 def draw_text_lines(frame: np.ndarray, lines: Sequence[str], origin: tuple[int, int] = HUD_ORIGIN) -> None:

@@ -89,6 +89,11 @@ renderer:
   panel_width_ratio: 0.5 # side panel (info on top, meme below), as a share of the camera width
   show_skeleton: true
 
+sound: # a short chime when a meme appears; the same for every meme
+  enabled: true
+  volume: 0.35 # peak, as a share of full scale
+  cooldown_seconds: 1.5 # quick pose changes chime once, not in bursts
+
 data:
   samples_dir: data/samples
   reports_dir: reports
@@ -100,6 +105,7 @@ ui:
   fps_window: 30 # frames averaged by the FPS counter
   timing_warmup_frames: 60 # left out of the per-stage times printed on exit
   max_window_width: 1600 # pixels; camera + panel shrink evenly to fit, never stretched
+  sound_key: m # mutes/unmutes the meme sound
 
 collect:
   samples_per_class: 200 # per session; recording stops by itself here

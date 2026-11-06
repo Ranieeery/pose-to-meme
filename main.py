@@ -13,6 +13,7 @@ from pose_meme.config import AppConfig, ConfigError, load_config
 from pose_meme.features import extract_features
 from pose_meme.meme_index import ClipEncoder, MemeLoadError, MemeSelector, group_by_pose, index_memes, load_memes
 from pose_meme.renderer import ViewComposer, draw_body, info_lines
+from pose_meme.sound import MemeCue, create_player
 from pose_meme.stabilizer import PoseStabilizer
 from pose_meme.timing import FpsCounter, StageTimer, format_stats
 from pose_meme.tracker import (
@@ -25,6 +26,7 @@ from pose_meme.tracker import (
 CONFIG_PATH = Path(__file__).resolve().parent / "config.yaml"
 KEY_WAIT_MS = 1
 KEY_MASK = 0xFF
+CHIME_FILE = "meme_chime.wav"  # generated, next to the meme index cache
 
 
 def run(config: AppConfig) -> None:
@@ -49,10 +51,13 @@ def run(config: AppConfig) -> None:
             (height, width),
             config.renderer.panel_width_ratio,
             config.ui.max_window_width,
-            line_count=len(info_lines(0.0, neutral, 0.0)),
+            line_count=len(info_lines(0.0, neutral, 0.0, True, config.ui.sound_key)),
         )
         memes = load_memes(config.memes.dir, buckets, composer.layout.meme_size)
         selector = MemeSelector(memes, neutral, random.Random())
+        player = create_player(config.memes.cache_dir / CHIME_FILE, config.sound.volume)
+        cue = MemeCue(player, config.sound.cooldown_seconds)
+        cue.muted = not config.sound.enabled  # the key still turns it on
 
         try:
             while True:
@@ -73,12 +78,14 @@ def run(config: AppConfig) -> None:
                 with timer.measure("stabilizer+meme"):
                     pose = stabilizer.update(label)
                     meme = selector.update(pose)
+                    cue.update(meme, time.monotonic())
                 fps.tick(time.perf_counter())
 
                 with timer.measure("render"):
                     if show_skeleton:
                         draw_body(frame, body.pose, body.hands, POSE_CONNECTIONS, HAND_CONNECTIONS, min_visibility)
-                    view = composer.compose(frame, info_lines(fps.fps, pose, confidence), meme)
+                    lines = info_lines(fps.fps, pose, confidence, not cue.muted, config.ui.sound_key)
+                    view = composer.compose(frame, lines, meme)
                 with timer.measure("display"):  # imshow + waitKey
                     cv2.imshow(title, view)
                     key = cv2.waitKey(KEY_WAIT_MS) & KEY_MASK
@@ -88,6 +95,8 @@ def run(config: AppConfig) -> None:
                     break
                 if key == ord(config.ui.skeleton_key):
                     show_skeleton = not show_skeleton
+                if key == ord(config.ui.sound_key):
+                    cue.muted = not cue.muted
         finally:
             cv2.destroyAllWindows()
 

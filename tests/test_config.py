@@ -53,6 +53,7 @@ VALID: dict[str, Any] = {
         "overrides": {"a.png": "maos_na_cabeca"},
     },
     "renderer": {"panel_width_ratio": 0.4, "show_skeleton": False},
+    "sound": {"enabled": False, "volume": 0.5, "cooldown_seconds": 2},
     "data": {"samples_dir": "samples", "reports_dir": "out"},
     "ui": {
         "window_title": "test",
@@ -61,6 +62,7 @@ VALID: dict[str, Any] = {
         "fps_window": 5,
         "timing_warmup_frames": 2,
         "max_window_width": 800,
+        "sound_key": "z",
     },
     "collect": {
         "samples_per_class": 10,
@@ -225,6 +227,7 @@ def test_unknown_key_is_rejected_to_catch_typos(tmp_path: Path) -> None:
         ("camera", "width", True),  # bool is an int in Python, but never what was meant
         ("camera", "mirror", 1),
         ("training", "mirror_augmentation", "yes"),
+        ("sound", "enabled", 1),
         ("stabilizer", "min_ratio", "high"),
         ("stabilizer", "min_ratio", True),
         ("memes", "dir", 3),
@@ -312,6 +315,12 @@ def test_wrong_type_is_rejected(tmp_path: Path, section: str, key: str, value: A
         ("ui", "skeleton_key", "ab"),
         ("ui", "skeleton_key", "x"),  # same key as quit_key
         ("ui", "fps_window", 1),
+        ("ui", "sound_key", "zz"),
+        ("ui", "sound_key", "x"),  # same key as quit_key
+        ("ui", "sound_key", "y"),  # same key as skeleton_key
+        ("sound", "volume", 0),
+        ("sound", "volume", 1.1),
+        ("sound", "cooldown_seconds", -1),
         ("ui", "timing_warmup_frames", -1),
         ("ui", "max_window_width", 0),
     ],

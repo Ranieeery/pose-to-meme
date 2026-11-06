@@ -158,7 +158,7 @@ def test_hands_are_drawn_even_without_a_pose() -> None:
 
 
 def test_info_lines_show_each_value() -> None:
-    lines = info_lines(fps=29.97, pose="mao_no_ombro", confidence=0.876)
+    lines = info_lines(fps=29.97, pose="mao_no_ombro", confidence=0.876, sound_on=True, sound_key="m")
 
     text = " | ".join(lines)
     assert "30.0" in text
@@ -167,7 +167,16 @@ def test_info_lines_show_each_value() -> None:
 
 
 def test_info_lines_have_a_fixed_count_so_the_layout_never_moves() -> None:
-    assert len(info_lines(0.0, "neutro", 0.0)) == len(info_lines(99.0, "garras_para_frente", 1.0))
+    assert len(info_lines(0.0, "neutro", 0.0, True, "m")) == len(info_lines(99.0, "garras_para_frente", 1.0, False, "m"))
+
+
+def test_info_lines_show_the_sound_state_and_its_key() -> None:
+    on = " | ".join(info_lines(30.0, "neutro", 1.0, sound_on=True, sound_key="m"))
+    off = " | ".join(info_lines(30.0, "neutro", 1.0, sound_on=False, sound_key="m"))
+
+    assert "ligado" in on
+    assert "desligado" in off
+    assert "[m]" in on
 
 
 def test_text_lines_go_down_the_frame() -> None:

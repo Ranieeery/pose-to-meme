@@ -123,6 +123,14 @@ class UiConfig:
     fps_window: int
     timing_warmup_frames: int
     max_window_width: int  # camera + panel shrink together to fit it
+    sound_key: str
+
+
+@dataclass(frozen=True)
+class SoundConfig:
+    enabled: bool
+    volume: float  # peak, as a share of full scale
+    cooldown_seconds: float  # minimum time between two chimes
 
 
 @dataclass(frozen=True)
@@ -157,6 +165,7 @@ class AppConfig:
     poses: PosesConfig
     memes: MemesConfig
     renderer: RendererConfig
+    sound: SoundConfig
     data: DataConfig
     ui: UiConfig
     collect: CollectConfig
@@ -356,6 +365,15 @@ def _validate(config: AppConfig) -> None:
         ("ui.quit_key", ui.quit_key, len(ui.quit_key) == 1, "a single character"),
         ("ui.skeleton_key", ui.skeleton_key, len(ui.skeleton_key) == 1, "a single character"),
         ("ui.skeleton_key", ui.skeleton_key, ui.skeleton_key != ui.quit_key, "different from ui.quit_key"),
+        ("ui.sound_key", ui.sound_key, len(ui.sound_key) == 1, "a single character"),
+        (
+            "ui.sound_key",
+            ui.sound_key,
+            ui.sound_key not in (ui.quit_key, ui.skeleton_key),
+            "different from ui.quit_key and ui.skeleton_key",
+        ),
+        ("sound.volume", config.sound.volume, 0 < config.sound.volume <= 1, "in (0, 1]"),
+        ("sound.cooldown_seconds", config.sound.cooldown_seconds, config.sound.cooldown_seconds >= 0, ">= 0"),
         ("ui.fps_window", ui.fps_window, ui.fps_window >= 2, ">= 2"),
         ("ui.timing_warmup_frames", ui.timing_warmup_frames, ui.timing_warmup_frames >= 0, ">= 0"),
         ("ui.max_window_width", ui.max_window_width, ui.max_window_width > 0, "> 0"),
