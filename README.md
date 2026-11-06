@@ -2,7 +2,33 @@
 
 Rastreia a pose pela webcam e mostra um meme quando reconhece uma pose conhecida. Faça a mão de rock e aparece o meme de rock; junte as palmas e aparece o "amém". São 12 poses mais o `neutro`, reconhecidas em CPU comum, em tempo real.
 
-Os memes vêm de uma pasta local e são associados às poses sem treino, pelo CLIP. Para incluir um meme novo, basta colocar a imagem em `memes/`.
+![Demonstração: boneco de palito fazendo poses e o painel com a classe prevista e o meme](docs/demo.gif)
+
+_O boneco é reconstruído a partir de uma sessão gravada, sem câmera e sem rosto. O MLP do GIF foi treinado sem essa sessão, então ele mostra previsões numa sessão que o modelo nunca viu. O painel tem três linhas:_
+- _"Modelo": o palpite do classificador e a confiança dele._
+- _"Pose": o que o app aceita. Abaixo de 0,8 de confiança, o palpite vira `neutro`, e o estabilizador espera a nova pose se firmar antes de trocar._
+- _"Gravado": o rótulo verdadeiro._
+
+_Para gerar de novo: `python -m scripts.demo_gif`._
+
+Os memes vêm de uma pasta local e são associados às poses sem treino, pelo CLIP. Para incluir um meme novo, basta colocar a imagem em `memes/`. As 12 poses, com o gesto de cada uma, estão no [guia de gravação](docs/gravacao.md#poses).
+
+## Destaques
+
+- **92% de acurácia em sessões que o modelo nunca viu:** avaliação por sessão (leave-one-session-out), comparada com KNN e com regras geométricas.
+- **Cerca de 29 FPS em CPU comum:** pose e mãos rodam em paralelo, e classificação, estabilização e render somam cerca de 2 ms por frame.
+- **Memes associados às poses sem treino:** CLIP zero-shot, só na indexação e com cache. Para incluir um meme, basta colocar a imagem na pasta.
+- **Decisões de ML medidas e explicadas:**
+  - split por sessão, contra o vazamento entre frames;
+  - uma única fonte de features, contra o training-serving skew;
+  - espelhamento só no treino, de 0,874 para 0,922;
+  - limitações declaradas.
+- **Engenharia:**
+  - 436 testes unitários sem câmera e sem baixar modelos, rodando no CI do GitHub Actions;
+  - config validado;
+  - checklist reproduzível para adicionar poses (`/nova-pose`).
+
+**Stack:** Python 3.12, MediaPipe Tasks (pose e mãos), OpenCV, scikit-learn (MLP), sentence-transformers (CLIP), NumPy e pytest.
 
 ## Como funciona
 
@@ -17,7 +43,8 @@ câmera → tracker → features → classificador → estabilizador → memes �
 | classificador | `pose_meme/classifier.py` | MLP do scikit-learn; regras geométricas quando não há modelo treinado |
 | estabilizador | `pose_meme/stabilizer.py` | a pose só muda quando uma classe domina 70% dos últimos 8 frames |
 | memes | `pose_meme/meme_index.py` | embeddings do CLIP calculados na indexação e guardados em cache; no loop, só uma consulta a um dicionário |
-| render | `pose_meme/renderer.py` | esqueleto sobre a câmera e painel ao lado, com pose, confiança e FPS em cima e o meme embaixo |
+| render | `pose_meme/renderer.py` | esqueleto sobre a câmera e painel ao lado: pose, confiança, FPS e estado do som em cima, meme embaixo, sem esticar a imagem |
+| som | `pose_meme/sound.py` | um plim curto quando um meme aparece, gerado por código e tocado sem travar o loop |
 
 O `main.py` só liga as etapas. Coleta (`scripts/collect.py`), treino (`scripts/train.py`) e app usam o mesmo `features.py`.
 
@@ -132,8 +159,8 @@ Medido só em CPU (a GPU não é usada), com uma câmera de 1280x720 a 30 FPS, r
 ## Limitações
 
 - **Uma pessoa só:** todas as sessões são do mesmo usuário. A acurácia em outras pessoas não foi medida.
-- **Mão fantasma:** o `HandLandmarker` às vezes detecta uma mão inexistente perto do ombro. Isso ocorreu em 41 frames de `mao_na_gravata` da `sessao_04`. O filtro está no [roadmap](docs/roadmap.md), porque um corte simples por distância também descartaria mãos reais.
-- **`min_similarity` não separa memes de imagens sem pessoa:** imagens sem pessoa pontuam de 0,145 a 0,197, e os memes de 0,178 a 0,240, então as faixas se sobrepõem. O limite de 0,16 só descarta ruído e formas simples. Uma "classe nula" está no roadmap.
+- **Mão fantasma:** o `HandLandmarker` às vezes detecta uma mão inexistente perto do ombro. Isso ocorreu em 41 frames de `mao_na_gravata` da `sessao_04`. Um corte simples por distância ao punho não resolve, porque também descartaria mãos reais.
+- **`min_similarity` não separa memes de imagens sem pessoa:** imagens sem pessoa pontuam de 0,145 a 0,197, e os memes de 0,178 a 0,240, então as faixas se sobrepõem. O limite de 0,16 só descarta ruído e formas simples.
 - **Sessão incompleta:** a `sessao_02` não tem as duas poses criadas depois dela (`maos_na_cabeca` e `mao_na_gravata`).
 
 ## Setup
@@ -182,6 +209,8 @@ python -m scripts.index_memes
 ```
 
 Se um meme cair na pose errada, corrija em `memes.overrides`, no `config.yaml`. Uma margem pequena, perto de 0,01, indica que o CLIP ficou em dúvida entre duas classes.
+
+As imagens em `memes/` são memes conhecidos, de figuras públicas e imagens virais. Os direitos pertencem aos respectivos autores. Elas estão aqui só para demonstração, sem fins comerciais, e podem ser removidas a pedido.
 
 ## Treinar o classificador
 
