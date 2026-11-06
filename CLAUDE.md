@@ -100,6 +100,11 @@ meme-pose/
 - **Nada é esticado:** a janela tem tamanho fixo (redimensionar a janela no Windows estica a imagem). Se câmera + painel passarem de `ui.max_window_width`, a câmera é reduzida por igual nos dois eixos antes de montar o painel.
 - Painel com pose atual, confiança e FPS; esqueleto desenhável on/off por tecla.
 
+### Som
+- Um único som curto para todos os memes, tocado quando um meme aparece (uma vez por aparição, com `sound.cooldown_seconds` entre toques). Tecla `ui.sound_key` liga/desliga.
+- Gerado por código (`pose_meme/sound.py`) e gravado no cache: nenhum arquivo de áudio no repositório.
+- Tocado de forma assíncrona (`winsound`, `SND_ASYNC`), para o loop de frames nunca esperar pelo áudio.
+
 ### Desempenho
 - Orçamento por frame: tracking (pose + mãos) é o gargalo; classificação e render devem ser desprezíveis.
 - `timing.py` mede tempo por etapa; os números vão para uma tabela no README.

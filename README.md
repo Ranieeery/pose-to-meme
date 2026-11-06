@@ -169,6 +169,9 @@ python main.py
 |---|---|
 | `q` | fecha o app e imprime os tempos por etapa |
 | `s` | liga/desliga o esqueleto |
+| `m` | liga/desliga o som |
+
+Quando um meme aparece, toca um plim curto, o mesmo para todos os memes. Ele toca uma vez por aparição e no máximo a cada 1,5 s, para trocas rápidas de pose não virarem uma sequência de plins. O volume, o intervalo e se o app já abre com som ficam na seção `sound` do `config.yaml`. O som usa o `winsound`, da biblioteca padrão do Windows.
 
 ## Memes
 
