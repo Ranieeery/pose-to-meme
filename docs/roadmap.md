@@ -4,7 +4,6 @@ Itens fora do escopo do MVP. Marque `[x]` quando implementado e mova para "Concl
 
 ## Prioridade alta
 
-- [ ] **Tabela de desempenho no README**: FPS e tempo por etapa (tracking, features, classificação, render) medidos na máquina de desenvolvimento, com modelo `lite` e `full`.
 - [ ] **Skill `/nova-pose`** (Claude): checklist reproduzível para adicionar uma pose:
   1. adicionar classe e prompt textual no `config.yaml`;
   2. coletar amostras em pelo menos duas sessões diferentes;
@@ -28,4 +27,4 @@ Itens fora do escopo do MVP. Marque `[x]` quando implementado e mova para "Concl
 
 ## Concluído
 
-_(vazio)_
+- [x] **Tabela de desempenho no README** (2026-11-06): tempo por etapa com `full` e `lite`; o tracking é o gargalo, e o `lite` não compensa porque as mãos rodam em paralelo com a pose.

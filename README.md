@@ -56,20 +56,23 @@ Nos 12 memes do repositório, comparei a classe do CLIP com a associação feita
 
 ### Desempenho
 
-Medido só em CPU (a GPU não é usada), com `python main.py`, que imprime esta tabela ao fechar e descarta os primeiros 60 frames.
+Medido só em CPU (a GPU não é usada), com uma câmera de 1280x720 a 30 FPS, rodando `python main.py`, que imprime esta tabela ao fechar e descarta os primeiros 60 frames. Cerca de 2000 frames por modelo.
 
 | Etapa | `full`: média (ms) | `full`: p95 (ms) | `lite`: média (ms) | `lite`: p95 (ms) |
 |---|---|---|---|---|
-| capture | | | | |
-| tracking | | | | |
-| features | | | | |
-| classifier | | | | |
-| stabilizer+meme | | | | |
-| render | | | | |
-| display | | | | |
-| **total (FPS)** | | | | |
+| capture | 4,42 | 6,60 | 5,09 | 8,85 |
+| tracking (pose + mãos) | 26,28 | 35,33 | 25,17 | 33,97 |
+| features | 0,15 | 0,19 | 0,15 | 0,19 |
+| classifier (MLP) | 0,54 | 0,67 | 0,55 | 0,70 |
+| stabilizer+meme | 0,02 | 0,02 | 0,02 | 0,02 |
+| render | 1,44 | 1,80 | 1,42 | 1,79 |
+| display | 2,03 | 2,44 | 2,02 | 2,41 |
+| **total** | **34,87 (28,7 FPS)** | | **34,42 (29,1 FPS)** | |
 
-O `capture` inclui a espera pelo próximo frame da câmera, então uma câmera a 30 FPS limita o total a uns 33 ms, por mais rápido que seja o resto.
+- **O tracking é o gargalo:** ocupa três quartos do frame. Features, classificação e estabilização somam menos de 1 ms.
+- **O `lite` não compensa:** ganha só 1 ms. Pose e mãos rodam em paralelo, então o tracking dura o que demora o mais lento dos dois, e o modelo de mãos é o mesmo nas duas variantes. Por isso o padrão continua `full`, que é mais preciso.
+- **O app chega perto dos 30 FPS da câmera:** o `capture` inclui a espera pelo próximo frame, então nenhuma otimização passaria de uns 33 ms por frame.
+- **O render caiu de 7,1 para 1,4 ms**, com o p95 de 19,9 para 1,8 ms. Antes, o meme com transparência era misturado ao painel a cada frame. Agora o painel com o meme é montado só quando o meme muda, e a imagem da janela é reaproveitada.
 
 ## Decisões
 
