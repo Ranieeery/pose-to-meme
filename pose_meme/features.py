@@ -119,6 +119,43 @@ def _hand_start(side: str) -> int:
     return _HANDS_START + SIDES.index(side) * _HAND_BLOCK
 
 
+def _other_side(name: str) -> str:
+    for side, other in zip(SIDES, reversed(SIDES)):
+        if name.startswith(f"{side}_"):
+            return f"{other}_{name.removeprefix(f'{side}_')}"
+    return name
+
+
+def _mirror_plan() -> tuple[np.ndarray, np.ndarray]:
+    """For each output position: which input position it reads, and the sign to apply."""
+    source = np.arange(FEATURE_SIZE)
+    sign = np.ones(FEATURE_SIZE)
+    for position, name in enumerate(_POSE_NAMES):
+        partner = _POSE_NAMES.index(_other_side(name))
+        for axis in range(COORDINATES):
+            source[position * COORDINATES + axis] = partner * COORDINATES + axis
+        sign[position * COORDINATES] = -1.0  # x
+        source[_FLAGS_START + position] = _FLAGS_START + partner
+    for side in SIDES:
+        start, partner_start = _hand_start(side), _hand_start(SIDES[1 - SIDES.index(side)])
+        source[start : start + _HAND_BLOCK] = np.arange(partner_start, partner_start + _HAND_BLOCK)
+        sign[start : start + _HAND_COORDINATES : COORDINATES] = -1.0  # x of every hand point
+    return source, sign
+
+
+_MIRROR_SOURCE, _MIRROR_SIGN = _mirror_plan()
+
+
+def mirror_features(features: np.ndarray) -> np.ndarray:
+    """The vector of the same pose mirrored left to right, for one vector or rows of them.
+
+    Body units are centered on the shoulders, so mirroring negates x; the left and
+    right pose points and hands also trade places, flags included. Missing points stay
+    zero. Meant for training data only: the app never mirrors what it classifies.
+    """
+    return features[..., _MIRROR_SOURCE] * _MIRROR_SIGN
+
+
 class FeatureView:
     """Named read access to a feature vector, so no other module depends on its layout."""
 

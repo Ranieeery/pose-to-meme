@@ -20,6 +20,7 @@
     "maos_na_cabeca": 400,
     "mao_na_gravata": 400
   },
+  "mirror_augmentation": true,
   "sessions_missing_classes": {
     "sessao_02": [
       "mao_na_gravata",
@@ -28,60 +29,60 @@
   },
   "classifiers": {
     "mlp": {
-      "accuracy": 0.8741891891891892,
-      "macro_f1": 0.8715218094581628,
+      "accuracy": 0.9218918918918919,
+      "macro_f1": 0.9205946900598571,
       "per_class_f1": {
-        "apontando_para_si": 0.7939068100358423,
-        "dedo_levantado": 0.876058506543495,
-        "dedo_na_boca": 0.8266228430566968,
-        "garras_para_frente": 0.7973977695167286,
-        "mao_aberta_na_boca": 0.9001610305958132,
-        "mao_fechada_na_boca": 0.9300758213984835,
-        "mao_na_gravata": 0.747016706443914,
-        "mao_no_ombro": 0.9260763606823721,
-        "maos_abertas_para_frente": 0.8875739644970414,
-        "maos_na_cabeca": 0.9559902200488998,
-        "maos_unidas": 0.9983361064891847,
-        "neutro": 0.8110599078341014,
-        "sinal_de_rock": 0.8795074758135444
+        "apontando_para_si": 0.8474295190713101,
+        "dedo_levantado": 0.8867924528301887,
+        "dedo_na_boca": 0.9704433497536946,
+        "garras_para_frente": 0.8041237113402062,
+        "mao_aberta_na_boca": 0.9765494137353434,
+        "mao_fechada_na_boca": 0.9528455284552846,
+        "mao_na_gravata": 0.9033112582781457,
+        "mao_no_ombro": 0.9891395154553049,
+        "maos_abertas_para_frente": 0.9009009009009009,
+        "maos_na_cabeca": 0.9491945477075588,
+        "maos_unidas": 0.9991673605328892,
+        "neutro": 0.8108597285067873,
+        "sinal_de_rock": 0.9769736842105263
       },
-      "accuracy_after_threshold": 0.8383783783783784,
-      "false_meme_rate": 0.15666666666666668,
-      "worst_session_accuracy": 0.7907692307692308,
+      "accuracy_after_threshold": 0.9060810810810811,
+      "false_meme_rate": 0.165,
+      "worst_session_accuracy": 0.8719230769230769,
       "per_session": {
-        "sessao_02": 0.8909090909090909,
-        "sessao_03": 0.7907692307692308,
-        "sessao_04": 0.9434615384615385
+        "sessao_02": 0.9436363636363636,
+        "sessao_03": 0.8719230769230769,
+        "sessao_04": 0.9534615384615385
       },
-      "latency_ms": 0.2982499991048826
+      "latency_ms": 0.30169999990903307
     },
     "knn": {
-      "accuracy": 0.7644594594594595,
-      "macro_f1": 0.7673776261534708,
+      "accuracy": 0.812972972972973,
+      "macro_f1": 0.81320931693647,
       "per_class_f1": {
-        "apontando_para_si": 0.716,
-        "dedo_levantado": 0.7563739376770539,
-        "dedo_na_boca": 0.5260311020960108,
-        "garras_para_frente": 0.7374407582938388,
-        "mao_aberta_na_boca": 0.6970740103270223,
-        "mao_fechada_na_boca": 0.6175024582104228,
-        "mao_na_gravata": 0.6407322654462243,
-        "mao_no_ombro": 0.9341317365269461,
-        "maos_abertas_para_frente": 0.8478581979320532,
-        "maos_na_cabeca": 0.9454094292803971,
-        "maos_unidas": 0.974817221770918,
-        "neutro": 0.7842401500938087,
-        "sinal_de_rock": 0.7982978723404255
+        "apontando_para_si": 0.718562874251497,
+        "dedo_levantado": 0.7564102564102564,
+        "dedo_na_boca": 0.672627235213205,
+        "garras_para_frente": 0.7988929889298892,
+        "mao_aberta_na_boca": 0.7793991416309013,
+        "mao_fechada_na_boca": 0.6842105263157895,
+        "mao_na_gravata": 0.7169344870210136,
+        "mao_no_ombro": 0.9360995850622407,
+        "maos_abertas_para_frente": 0.8831562974203339,
+        "maos_na_cabeca": 0.9439601494396015,
+        "maos_unidas": 0.9811937857726901,
+        "neutro": 0.8032638259292838,
+        "sinal_de_rock": 0.8970099667774086
       },
-      "accuracy_after_threshold": 0.7436486486486487,
-      "false_meme_rate": 0.2633333333333333,
-      "worst_session_accuracy": 0.7072727272727273,
+      "accuracy_after_threshold": 0.7856756756756756,
+      "false_meme_rate": 0.19833333333333333,
+      "worst_session_accuracy": 0.764090909090909,
       "per_session": {
-        "sessao_02": 0.7072727272727273,
-        "sessao_03": 0.7534615384615385,
-        "sessao_04": 0.8238461538461539
+        "sessao_02": 0.764090909090909,
+        "sessao_03": 0.8246153846153846,
+        "sessao_04": 0.8426923076923077
       },
-      "latency_ms": 1.0955999987345422
+      "latency_ms": 2.2958999979891814
     },
     "rules": {
       "accuracy": 0.7195945945945946,
@@ -109,7 +110,7 @@
         "sessao_03": 0.6726923076923077,
         "sessao_04": 0.74
       },
-      "latency_ms": 0.03199999991920777
+      "latency_ms": 0.02599999788799323
     }
   }
 }

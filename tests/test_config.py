@@ -77,6 +77,7 @@ VALID: dict[str, Any] = {
         "random_seed": 1,
         "min_sessions": 3,
         "max_class_f1_drop": 0.1,
+        "mirror_augmentation": False,
     },
 }
 
@@ -223,6 +224,7 @@ def test_unknown_key_is_rejected_to_catch_typos(tmp_path: Path) -> None:
         ("camera", "width", 640.5),
         ("camera", "width", True),  # bool is an int in Python, but never what was meant
         ("camera", "mirror", 1),
+        ("training", "mirror_augmentation", "yes"),
         ("stabilizer", "min_ratio", "high"),
         ("stabilizer", "min_ratio", True),
         ("memes", "dir", 3),

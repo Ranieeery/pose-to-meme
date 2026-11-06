@@ -143,6 +143,7 @@ class TrainingConfig:
     random_seed: int
     min_sessions: int
     max_class_f1_drop: float  # how much an existing class may lose when a pose is added
+    mirror_augmentation: bool  # train also on left-right mirrored copies; tests stay as recorded
 
 
 @dataclass(frozen=True)

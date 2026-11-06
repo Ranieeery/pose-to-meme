@@ -7,11 +7,13 @@ import pytest
 
 from pose_meme.config import RulesConfig, TrainingConfig
 from pose_meme.dataset import DatasetError, Samples
-from pose_meme.features import FEATURE_SIZE
+from pose_meme.features import FEATURE_SIZE, mirror_features
+from sklearn.base import BaseEstimator, ClassifierMixin
 from scripts.train import (
     build_knn,
     build_mlp,
     evaluate_by_session,
+    training_data,
     session_folds,
     train_and_report,
     sessions_missing_classes,
@@ -26,6 +28,7 @@ TRAINING = TrainingConfig(
     random_seed=0,
     min_sessions=2,
     max_class_f1_drop=0.05,
+    mirror_augmentation=False,
 )
 RULES = RulesConfig(
     mouth_radius=0.4,
@@ -104,13 +107,13 @@ def test_evaluation_cannot_memorize_frames_of_the_tested_session() -> None:
     labels = np.array(["a"] * 20 + ["b"] * 20 + ["b"] * 20 + ["a"] * 20)
     sessions = np.array(["s1"] * 40 + ["s2"] * 40)
 
-    evaluation = evaluate_by_session(build_knn(TRAINING), Samples(features, labels, sessions))
+    evaluation = evaluate_by_session(build_knn(TRAINING), Samples(features, labels, sessions), mirror=False)
 
     assert evaluation.accuracy == 0.0
 
 
 def test_evaluation_scores_separable_data_on_unseen_sessions() -> None:
-    evaluation = evaluate_by_session(build_mlp(TRAINING), make_samples())
+    evaluation = evaluate_by_session(build_mlp(TRAINING), make_samples(), mirror=False)
 
     assert evaluation.accuracy == 1.0
     assert set(evaluation.per_session) == {"s1", "s2", "s3"}
@@ -272,3 +275,73 @@ def test_metrics_have_the_f1_of_each_class(trained) -> None:
     per_class = metrics["classifiers"]["mlp"]["per_class_f1"]
     assert set(per_class) == set(metrics["samples_per_class"])
     assert all(0.0 <= value <= 1.0 for value in per_class.values())
+
+
+# Mirroring: more training data, never touching the tested session
+
+
+def test_mirroring_adds_a_mirrored_copy_of_every_training_row() -> None:
+    samples = make_samples()
+
+    features, labels = training_data(samples.features, samples.labels, mirror=True)
+
+    n = len(samples.labels)
+    assert features.shape == (2 * n, FEATURE_SIZE)
+    np.testing.assert_array_equal(features[:n], samples.features)
+    np.testing.assert_array_equal(features[n:], mirror_features(samples.features))
+    np.testing.assert_array_equal(labels, np.concatenate([samples.labels, samples.labels]))
+
+
+def test_without_mirroring_the_training_data_is_unchanged() -> None:
+    samples = make_samples()
+
+    features, labels = training_data(samples.features, samples.labels, mirror=False)
+
+    assert features is samples.features
+    assert labels is samples.labels
+
+
+class SpyClassifier(ClassifierMixin, BaseEstimator):
+    """Records what each fold trains on; clone() makes a new instance, so the log is shared."""
+
+    fits: list[np.ndarray] = []
+
+    def fit(self, features: np.ndarray, labels: np.ndarray) -> "SpyClassifier":
+        SpyClassifier.fits.append(features.copy())
+        self.classes_ = np.unique(labels)
+        return self
+
+    def predict_proba(self, features: np.ndarray) -> np.ndarray:
+        probabilities = np.zeros((len(features), len(self.classes_)))
+        probabilities[:, 0] = 1.0
+        return probabilities
+
+
+def test_mirrored_copies_of_the_tested_session_never_reach_training() -> None:
+    samples = make_samples()
+    SpyClassifier.fits = []
+
+    evaluate_by_session(SpyClassifier(), samples, mirror=True)
+
+    for (train, test), fitted in zip(session_folds(samples.sessions), SpyClassifier.fits, strict=True):
+        assert len(fitted) == 2 * len(train)
+        fitted_rows = {row.tobytes() for row in fitted}
+        assert not any(row.tobytes() in fitted_rows for row in samples.features[test])
+        assert not any(row.tobytes() in fitted_rows for row in mirror_features(samples.features[test]))
+
+
+def test_report_states_whether_mirroring_was_used(tmp_path: Path) -> None:
+    training = TrainingConfig(**{**TRAINING.__dict__, "mirror_augmentation": True})
+
+    metrics = train_and_report(
+        make_samples(),
+        training,
+        RULES,
+        neutral_class="neutro",
+        confidence_threshold=0.8,
+        model_path=tmp_path / "clf.joblib",
+        reports_dir=tmp_path,
+    )
+
+    assert metrics["mirror_augmentation"] is True
+    assert "espelhad" in (tmp_path / "report.md").read_text(encoding="utf-8")

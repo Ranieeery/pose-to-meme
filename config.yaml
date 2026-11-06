@@ -116,3 +116,4 @@ training:
   random_seed: 42
   min_sessions: 2 # one to train on and another to test on
   max_class_f1_drop: 0.05 # scripts.compare_metrics rejects a model where an existing class lost more F1
+  mirror_augmentation: true # also train on mirrored copies (never the tested session); MLP 0.874 -> 0.922

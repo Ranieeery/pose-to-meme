@@ -3,7 +3,7 @@ from dataclasses import replace
 import numpy as np
 import pytest
 
-from pose_meme.features import FEATURE_SIZE, HAND_POINTS, FeatureView, extract_features
+from pose_meme.features import FEATURE_SIZE, HAND_POINTS, POSE_POINTS, FeatureView, extract_features, mirror_features
 from tests.conftest import (
     LEFT_ELBOW,
     LEFT_SHOULDER,
@@ -152,3 +152,76 @@ def test_two_hands_never_land_on_the_same_arm(neutral_pose) -> None:
 
     assert view.hand("right")[0] == pytest.approx(FeatureView(extract(neutral_pose, [near])).hand("right")[0])
     assert view.hand("left") is not None
+
+
+# --- mirroring, for data augmentation ---
+
+ASPECT = 16 / 9
+
+
+def mirrored_person(pose: list[Landmark], hands: list[list[Landmark]]) -> tuple[list[Landmark], list[list[Landmark]]]:
+    """What the camera would see of the same person mirrored: x flipped, and the pose
+    labels swapped, since the person's left arm now looks like a right arm."""
+    partner = {
+        index: POSE_POINTS[name.replace("left_", "right_") if name.startswith("left_") else name.replace("right_", "left_")]
+        for name, index in POSE_POINTS.items()
+    }
+    flipped = [replace(landmark, x=1 - landmark.x) for landmark in pose]
+    mirrored_pose = [flipped[partner.get(index, index)] for index in range(len(pose))]
+    mirrored_hands = [[replace(landmark, x=1 - landmark.x) for landmark in hand] for hand in hands]
+    return mirrored_pose, mirrored_hands
+
+
+def asymmetric_scene() -> tuple[list[Landmark], list[list[Landmark]]]:
+    """Right hand up by the face, left arm down with its elbow hidden: nothing symmetric."""
+    pose = build_pose({RIGHT_WRIST: (0.4, 0.3), LEFT_WRIST: (0.62, 0.75)}, visibility={LEFT_ELBOW: 0.1})
+    return pose, [build_hand((0.4, 0.3), extended=("index",))]
+
+
+def test_mirrored_vector_matches_the_features_of_the_mirrored_person() -> None:
+    pose, hands = asymmetric_scene()
+    mirrored_pose, mirrored_hands = mirrored_person(pose, hands)
+
+    expected = extract_features(mirrored_pose, mirrored_hands, ASPECT, min_visibility=0.5)
+    mirrored = mirror_features(extract_features(pose, hands, ASPECT, min_visibility=0.5))
+
+    np.testing.assert_allclose(mirrored, expected, atol=1e-9)
+
+
+def test_mirroring_moves_the_hand_to_the_other_side() -> None:
+    pose, hands = asymmetric_scene()
+
+    mirrored = FeatureView(mirror_features(extract_features(pose, hands, ASPECT, min_visibility=0.5)))
+
+    assert mirrored.hand("right") is None
+    assert mirrored.hand("left") is not None
+    assert mirrored.point("right_elbow") is None  # the hidden elbow keeps its flag, on the other side
+
+
+def test_mirroring_twice_gives_back_the_original() -> None:
+    pose, hands = asymmetric_scene()
+    features = extract_features(pose, hands, ASPECT, min_visibility=0.5)
+
+    np.testing.assert_array_equal(mirror_features(mirror_features(features)), features)
+
+
+def test_mirroring_works_on_many_rows_at_once() -> None:
+    pose, hands = asymmetric_scene()
+    one = extract_features(pose, hands, ASPECT, min_visibility=0.5)
+    rows = np.stack([one, mirror_features(one)])
+
+    mirrored = mirror_features(rows)
+
+    assert mirrored.shape == (2, FEATURE_SIZE)
+    np.testing.assert_array_equal(mirrored[0], mirror_features(one))
+    np.testing.assert_array_equal(mirrored[1], one)
+
+
+def test_mirroring_does_not_change_its_input() -> None:
+    pose, hands = asymmetric_scene()
+    features = extract_features(pose, hands, ASPECT, min_visibility=0.5)
+    before = features.copy()
+
+    mirror_features(features)
+
+    np.testing.assert_array_equal(features, before)

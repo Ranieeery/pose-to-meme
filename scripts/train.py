@@ -27,7 +27,7 @@ from sklearn.preprocessing import StandardScaler
 from pose_meme.classifier import RULE_CONFIDENCE, MLClassifier, PoseClassifier, RuleClassifier, accept_pose
 from pose_meme.config import ConfigError, RulesConfig, TrainingConfig, load_config
 from pose_meme.dataset import DatasetError, Samples, read_samples
-from pose_meme.features import FEATURE_SIZE
+from pose_meme.features import FEATURE_SIZE, mirror_features
 
 CONFIG_PATH = Path(__file__).resolve().parent.parent / "config.yaml"
 LATENCY_SAMPLES = 200
@@ -107,11 +107,22 @@ def _summarize(predictions: np.ndarray, confidences: np.ndarray, samples: Sample
     return SessionEvaluation(predictions, confidences, float(correct.mean()), per_session)
 
 
-def evaluate_by_session(pipeline: Pipeline, samples: Samples) -> SessionEvaluation:
+def training_data(features: np.ndarray, labels: np.ndarray, mirror: bool) -> tuple[np.ndarray, np.ndarray]:
+    """The rows a model trains on: with mirror, each one also mirrored left to right.
+
+    A one-handed pose recorded mostly with one hand then also teaches the other. Only
+    ever applied to training rows, so the evaluation still measures recorded frames.
+    """
+    if not mirror:
+        return features, labels
+    return np.concatenate([features, mirror_features(features)]), np.concatenate([labels, labels])
+
+
+def evaluate_by_session(pipeline: Pipeline, samples: Samples, mirror: bool) -> SessionEvaluation:
     predictions = np.empty(len(samples.labels), dtype=samples.labels.dtype)
     confidences = np.empty(len(samples.labels))
     for train, test in session_folds(samples.sessions):
-        model = clone(pipeline).fit(samples.features[train], samples.labels[train])
+        model = clone(pipeline).fit(*training_data(samples.features[train], samples.labels[train], mirror))
         probabilities = model.predict_proba(samples.features[test])
         predictions[test] = model.classes_[probabilities.argmax(axis=1)]
         confidences[test] = probabilities.max(axis=1)
@@ -191,6 +202,12 @@ def _report_text(metrics: dict[str, Any], evaluations: dict[str, SessionEvaluati
         "As regras não são treinadas, então todas as sessões são inéditas para elas.",
         "",
     ]
+    if metrics["mirror_augmentation"]:
+        lines += [
+            "MLP e KNN treinaram também com cópias espelhadas (esquerda ↔ direita) das sessões de treino. "
+            "As sessões de teste são avaliadas como foram gravadas.",
+            "",
+        ]
     if incomplete := metrics["sessions_missing_classes"]:
         lines += ["## Aviso: sessões incompletas", "", "Estas sessões distorcem as métricas. Classes ausentes:", ""]
         lines += [f"- {session}: {', '.join(classes)}" for session, classes in incomplete.items()]
@@ -243,10 +260,12 @@ def train_and_report(
     pipelines = {"mlp": build_mlp(training), "knn": build_knn(training)}
     rule_classifier = RuleClassifier(rules, neutral_class)
 
-    evaluations = {name: evaluate_by_session(pipeline, samples) for name, pipeline in pipelines.items()}
+    mirror = training.mirror_augmentation
+    evaluations = {name: evaluate_by_session(pipeline, samples, mirror) for name, pipeline in pipelines.items()}
     evaluations["rules"] = _evaluate_rules(rule_classifier, samples)
 
-    final = {name: clone(pipeline).fit(samples.features, samples.labels) for name, pipeline in pipelines.items()}
+    all_rows = training_data(samples.features, samples.labels, mirror)
+    final = {name: clone(pipeline).fit(*all_rows) for name, pipeline in pipelines.items()}
     latencies = {name: _latency_ms(MLClassifier(model), samples) for name, model in final.items()}
     latencies["rules"] = _latency_ms(rule_classifier, samples)
 
@@ -254,6 +273,7 @@ def train_and_report(
         "sessions": sorted(set(samples.sessions.tolist())),
         "samples": len(samples.labels),
         "samples_per_class": dict(Counter(samples.labels.tolist())),
+        "mirror_augmentation": mirror,
         "sessions_missing_classes": sessions_missing_classes(samples),
         "classifiers": {
             name: _metrics(evaluation, samples, neutral_class, confidence_threshold, latencies[name])
