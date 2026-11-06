@@ -98,6 +98,7 @@ ui:
   quit_key: q
   skeleton_key: s
   fps_window: 30 # frames averaged by the FPS counter
+  timing_warmup_frames: 60 # left out of the per-stage times printed on exit
 
 collect:
   samples_per_class: 200 # per session; recording stops by itself here

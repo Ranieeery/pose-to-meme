@@ -14,7 +14,7 @@ from pose_meme.features import extract_features
 from pose_meme.meme_index import ClipEncoder, MemeLoadError, MemeSelector, group_by_pose, index_memes, load_memes
 from pose_meme.renderer import draw_body, draw_hud, overlay_centered
 from pose_meme.stabilizer import PoseStabilizer
-from pose_meme.timing import FpsCounter
+from pose_meme.timing import FpsCounter, StageTimer, format_stats
 from pose_meme.tracker import (
     HAND_CONNECTIONS,
     POSE_CONNECTIONS,
@@ -33,6 +33,7 @@ def run(config: AppConfig) -> None:
     min_visibility = config.tracker.min_visibility
     show_skeleton = config.renderer.show_skeleton
     fps = FpsCounter(config.ui.fps_window)
+    timer = StageTimer(config.ui.timing_warmup_frames)
     classifier = load_classifier(config.classifier.model_path, config.rules, neutral)
     print(f"classifier: {type(classifier).__name__}")
     stabilizer = PoseStabilizer(config.stabilizer.window_size, config.stabilizer.min_ratio, initial=neutral)
@@ -49,34 +50,46 @@ def run(config: AppConfig) -> None:
 
         try:
             while True:
-                frame = camera.read()
-                body = tracker.detect(frame)
-                features = (
-                    extract_features(body.pose, body.hands, width / height, min_visibility)
-                    if body.pose is not None
-                    else None
-                )
-                label, confidence = classify_frame(
-                    classifier, features, config.classifier.confidence_threshold, neutral
-                )
-                pose = stabilizer.update(label)
-                meme = selector.update(pose)
+                with timer.measure("capture"):  # includes waiting for the camera's next frame
+                    frame = camera.read()
+                with timer.measure("tracking"):  # pose and hands, in parallel
+                    body = tracker.detect(frame)
+                with timer.measure("features"):
+                    features = (
+                        extract_features(body.pose, body.hands, width / height, min_visibility)
+                        if body.pose is not None
+                        else None
+                    )
+                with timer.measure("classifier"):
+                    label, confidence = classify_frame(
+                        classifier, features, config.classifier.confidence_threshold, neutral
+                    )
+                with timer.measure("stabilizer+meme"):
+                    pose = stabilizer.update(label)
+                    meme = selector.update(pose)
                 fps.tick(time.perf_counter())
 
-                if show_skeleton:
-                    draw_body(frame, body.pose, body.hands, POSE_CONNECTIONS, HAND_CONNECTIONS, min_visibility)
-                if meme is not None:
-                    overlay_centered(frame, meme)
-                draw_hud(frame, fps.fps, pose, confidence)
-                cv2.imshow(title, frame)
+                with timer.measure("render"):
+                    if show_skeleton:
+                        draw_body(frame, body.pose, body.hands, POSE_CONNECTIONS, HAND_CONNECTIONS, min_visibility)
+                    if meme is not None:
+                        overlay_centered(frame, meme)
+                    draw_hud(frame, fps.fps, pose, confidence)
+                with timer.measure("display"):  # imshow + waitKey
+                    cv2.imshow(title, frame)
+                    key = cv2.waitKey(KEY_WAIT_MS) & KEY_MASK
+                timer.end_frame()
 
-                key = cv2.waitKey(KEY_WAIT_MS) & KEY_MASK
                 if key == ord(config.ui.quit_key) or cv2.getWindowProperty(title, cv2.WND_PROP_VISIBLE) < 1:
                     break
                 if key == ord(config.ui.skeleton_key):
                     show_skeleton = not show_skeleton
         finally:
             cv2.destroyAllWindows()
+
+    if table := format_stats(timer.stats()):
+        print(f"\ntiming: model {config.tracker.model_variant}, frame {width}x{height}, {type(classifier).__name__}")
+        print("\n".join(table))
 
 
 def main() -> None:

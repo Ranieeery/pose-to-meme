@@ -120,6 +120,7 @@ class UiConfig:
     quit_key: str
     skeleton_key: str
     fps_window: int
+    timing_warmup_frames: int
 
 
 @dataclass(frozen=True)
@@ -346,6 +347,7 @@ def _validate(config: AppConfig) -> None:
         ("ui.skeleton_key", ui.skeleton_key, len(ui.skeleton_key) == 1, "a single character"),
         ("ui.skeleton_key", ui.skeleton_key, ui.skeleton_key != ui.quit_key, "different from ui.quit_key"),
         ("ui.fps_window", ui.fps_window, ui.fps_window >= 2, ">= 2"),
+        ("ui.timing_warmup_frames", ui.timing_warmup_frames, ui.timing_warmup_frames >= 0, ">= 0"),
         ("camera.index", camera.index, camera.index >= 0, ">= 0"),
         ("camera.width", camera.width, camera.width > 0, "> 0"),
         ("camera.height", camera.height, camera.height > 0, "> 0"),

@@ -54,7 +54,13 @@ VALID: dict[str, Any] = {
     },
     "renderer": {"meme_height_ratio": 0.5, "show_skeleton": False},
     "data": {"samples_dir": "samples", "reports_dir": "out"},
-    "ui": {"window_title": "test", "quit_key": "x", "skeleton_key": "y", "fps_window": 5},
+    "ui": {
+        "window_title": "test",
+        "quit_key": "x",
+        "skeleton_key": "y",
+        "fps_window": 5,
+        "timing_warmup_frames": 2,
+    },
     "collect": {
         "samples_per_class": 10,
         "sample_every": 1,
@@ -300,6 +306,7 @@ def test_wrong_type_is_rejected(tmp_path: Path, section: str, key: str, value: A
         ("ui", "skeleton_key", "ab"),
         ("ui", "skeleton_key", "x"),  # same key as quit_key
         ("ui", "fps_window", 1),
+        ("ui", "timing_warmup_frames", -1),
     ],
 )
 def test_out_of_range_value_is_rejected(tmp_path: Path, section: str, key: str, value: Any) -> None:
