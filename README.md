@@ -229,3 +229,5 @@ O comparador rejeita o modelo se alguma pose existente perder mais F1 que `train
 pytest -q                 # testes unitários: sem câmera, sem .task e sem baixar o CLIP
 pytest -m integration -q  # usa os modelos reais
 ```
+
+O GitHub Actions (`.github/workflows/tests.yml`) roda os testes unitários a cada push e pull request, no Windows com Python 3.12. Os de integração ficam de fora, porque precisam da câmera, dos `.task` e do CLIP.
