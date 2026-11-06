@@ -1,0 +1,32 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+# A newer push to the same branch makes the running check obsolete.
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    # Same OS as development (see CLAUDE.md). On Windows, PyPI's torch (pulled in by
+    # sentence-transformers) is the CPU build; on Linux it would bring CUDA, several GB.
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      # pytest.ini deselects the integration tests: no webcam, .task files or CLIP download here.
+      - name: Unit tests
+        run: python -m pytest -q
