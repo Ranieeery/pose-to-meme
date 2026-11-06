@@ -84,7 +84,9 @@ meme-pose/
 
 ### Memes e embeddings
 - Formatos aceitos em `memes/`: `.png`, `.webp`, `.jpg`/`.jpeg` (extensão case-insensitive). PNG e WebP podem ter alpha. WebP animado usa só o primeiro frame. Outros arquivos da pasta são ignorados com aviso no log.
-- CLIP `clip-ViT-B-32` via `sentence-transformers`. **O CLIP nunca roda no loop de frames**: só na indexação.
+- CLIP `clip-ViT-L-14` via `sentence-transformers` (o `clip-ViT-B-32` acertou só 7 dos 12 memes do repositório). **O CLIP nunca roda no loop de frames**: só na indexação.
+- O embedding de cada classe é a média do prompt aplicado a vários templates (`memes.prompt_templates`).
+- `memes.overrides` (arquivo → classe) corrige à mão os memes que o CLIP erra; o `scripts/index_memes.py` mostra a classe, a similaridade e a margem de cada meme.
 - Cada classe tem um prompt textual em inglês no `config.yaml`; memes são atribuídos por similaridade cosseno (zero-shot). Cada meme vai para a classe de maior similaridade, desde que acima de um threshold mínimo; abaixo disso, é ignorado.
 - Embeddings ficam em cache em `data/cache/`, invalidados por hash do conteúdo da pasta `memes/` + nome do modelo.
 - O módulo recebe o encoder por **injeção de dependência**, para que testes usem um encoder falso sem baixar o CLIP.

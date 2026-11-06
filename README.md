@@ -34,6 +34,16 @@ python main.py
 | `q` | fecha o app |
 | `s` | liga/desliga o esqueleto |
 
+## Memes
+
+Coloque as imagens em `memes/` (`.png`, `.webp`, `.jpg` ou `.jpeg`). Cada uma vai para a pose de prompt mais parecido no `config.yaml`, pelo CLIP (`clip-ViT-L-14`), sem treino. O app reindexa sozinho ao abrir quando a pasta muda. Na primeira vez, baixa o modelo (cerca de 1,6 GB). Para ver a classe e a margem de cada meme:
+
+```powershell
+python -m scripts.index_memes
+```
+
+Se um meme cair na pose errada, corrija em `memes.overrides`, no `config.yaml`. Nos 12 memes do repositório, o CLIP acertou 9 sozinho, e os 3 erros perderam por menos de 0,01 de similaridade.
+
 ## Treinar o classificador
 
 O app usa o modelo treinado em `models/pose_clf.joblib` se ele existir, e as regras geométricas se não existir.
