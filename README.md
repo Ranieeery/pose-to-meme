@@ -51,7 +51,7 @@ python -m scripts.collect
 | `s` | liga/desliga o esqueleto |
 | `q` | fecha e encerra a sessão |
 
-A gravação para sozinha ao atingir `collect.samples_per_class` por classe. Cada execução cria uma nova sessão em `data/samples/`.
+A gravação para sozinha ao atingir `collect.samples_per_class` por classe. Cada execução cria uma nova sessão em `data/samples/`. O passo a passo, com as poses de cada tecla, está em [docs/gravacao.md](docs/gravacao.md).
 
 **2. Avalie e treine:**
 
