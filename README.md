@@ -1,10 +1,124 @@
 # meme-pose
 
-Rastreia a pose pela webcam e mostra um meme quando reconhece uma pose conhecida.
+Rastreia a pose pela webcam e mostra um meme quando reconhece uma pose conhecida. Faça a mão de rock e aparece o meme de rock; junte as palmas e aparece o "amém". São 12 poses mais o `neutro`, reconhecidas em CPU comum, em tempo real.
+
+Os memes vêm de uma pasta local e são associados às poses sem treino, pelo CLIP. Para incluir um meme novo, basta colocar a imagem em `memes/`.
+
+## Como funciona
+
+```
+câmera → tracker → features → classificador → estabilizador → memes → render → janela
+```
+
+| Etapa | Módulo | O que faz |
+|---|---|---|
+| tracker | `pose_meme/tracker.py` | MediaPipe `PoseLandmarker` (tronco e braços) e `HandLandmarker` (21 pontos por mão), em paralelo |
+| features | `pose_meme/features.py` | vetor de 125 valores, normalizado pelo corpo (veja [Decisões](#decisões)) |
+| classificador | `pose_meme/classifier.py` | MLP do scikit-learn; regras geométricas quando não há modelo treinado |
+| estabilizador | `pose_meme/stabilizer.py` | a pose só muda quando uma classe domina 70% dos últimos 8 frames |
+| memes | `pose_meme/meme_index.py` | embeddings do CLIP calculados na indexação e guardados em cache; no loop, só uma consulta a um dicionário |
+| render | `pose_meme/renderer.py` | meme centralizado com alpha, esqueleto e HUD |
+
+O `main.py` só liga as etapas. Coleta (`scripts/collect.py`), treino (`scripts/train.py`) e app usam o mesmo `features.py`.
+
+## Resultados
+
+### Classificador
+
+Três sessões gravadas em dias diferentes, 7400 amostras. Cada sessão é testada por um modelo que não a viu (leave-one-session-out), e as métricas somam as três.
+
+| Classificador | Acurácia | F1 macro | Pior sessão | Meme indevido em `neutro` | Latência |
+|---|---|---|---|---|---|
+| **MLP** (o modelo salvo) | **0,874** | **0,872** | **0,791** | **0,157** | 0,34 ms |
+| KNN (baseline) | 0,764 | 0,767 | 0,707 | 0,263 | 0,78 ms |
+| Regras (baseline) | 0,720 | 0,688 | 0,673 | 0,255 | 0,03 ms |
+
+- **"Meme indevido em `neutro`"** é a fração de frames sem pose em que o app mostraria um meme, ou seja, o erro que o usuário mais percebe.
+- **As classes mais fracas** são `mao_na_gravata` (F1 0,75), que se confunde com `mao_no_ombro`, e `neutro`, com 73% de recall.
+- **O relatório completo**, com a matriz de confusão por classificador, está em [reports/report.md](reports/report.md).
+
+**Por que três sessões:** com só duas, o MLP fazia 0,533 de acurácia e ficava abaixo das regras.
+- **O que mudou:** as duas sessões tinham gravado o `neutro` de jeitos diferentes, uma sem mãos visíveis e a outra com. Cada modelo aprendia um `neutro` que a sessão de teste não tinha, e o recall do `neutro` ficava em 0.
+- **O que isso mostra:** o split aleatório nunca teria revelado o problema, como explica a seção [Decisões](#decisões).
+
+### Memes
+
+Nos 12 memes do repositório, comparei a classe do CLIP com a associação feita à mão:
+
+| Modelo | Prompt por classe | Acertos |
+|---|---|---|
+| `clip-ViT-B-32` | um | 7/12 |
+| `clip-ViT-L-14` | média de 4 templates | 9/12 |
+
+- **Os 3 erros do L-14** perdem por menos de 0,01 de similaridade e foram corrigidos em `memes.overrides`.
+- **Os números são otimistas:** a mesma amostra de 12 memes serviu para escolher o modelo e para medir.
+- **A indexação** leva 41 s com o modelo, e 0,5 s quando o cache está em dia.
+
+### Desempenho
+
+Medido só em CPU (a GPU não é usada), com `python main.py`, que imprime esta tabela ao fechar e descarta os primeiros 60 frames.
+
+| Etapa | `full`: média (ms) | `full`: p95 (ms) | `lite`: média (ms) | `lite`: p95 (ms) |
+|---|---|---|---|---|
+| capture | | | | |
+| tracking | | | | |
+| features | | | | |
+| classifier | | | | |
+| stabilizer+meme | | | | |
+| render | | | | |
+| display | | | | |
+| **total (FPS)** | | | | |
+
+O `capture` inclui a espera pelo próximo frame da câmera, então uma câmera a 30 FPS limita o total a uns 33 ms, por mais rápido que seja o resto.
+
+## Decisões
+
+**Split por sessão, nunca aleatório.**
+- **O problema:** frames consecutivos são quase idênticos. Num split aleatório, cada frame de teste tem um "gêmeo" no treino, e a acurácia mede memorização.
+- **Como avalio:** cada amostra carrega o `session_id`, e a avaliação é leave-one-session-out: cada sessão é testada por um modelo treinado nas outras.
+- **Por que importa:** foi esse split que expôs o problema do `neutro` descrito acima.
+
+**Uma única fonte de features, contra o training-serving skew.**
+- **O risco:** se a coleta e o app calculassem as features de jeitos diferentes, o modelo seria avaliado num formato e usado em outro, sem nenhum erro aparente.
+- **Como evito:** o `features.py` é o único que transforma landmarks em vetor, e coleta, treino e app chamam a mesma função.
+- **O custo:** os CSVs guardam o vetor, não os landmarks. Mudar as features exige gravar de novo ou reaplicar a mudança aos vetores guardados.
+
+**Features invariantes à posição, à distância e ao tamanho do frame.**
+- **Normalização:**
+  1. o x é corrigido pela proporção do frame, porque o MediaPipe normaliza cada eixo separadamente;
+  2. a origem vai para o centro dos ombros;
+  3. tudo é dividido pela distância entre os ombros.
+- **Associação das mãos:** cada mão vai para o punho da pose mais próximo, e não pelo rótulo esquerda/direita do modelo, que falha em frame espelhado.
+- **Mão não detectada:** não descarta a amostra. O vetor mantém o tamanho e leva um indicador de presença.
+
+**Pose e mãos em paralelo.** Em sequência, os dois modelos do MediaPipe passam do orçamento de um frame a 30 FPS.
+
+**Classe `neutro`, threshold e estabilizador.**
+- **Classe `neutro`:** o classificador sempre escolhe alguma classe, então o "nenhuma pose" é uma classe treinada como as outras.
+- **Threshold:** um meme só aparece com confiança de pelo menos 0,8.
+- **Estabilizador:** a pose só muda quando se sustenta por vários frames. O meme é sorteado na troca de pose e fica enquanto ela durar.
+
+**O MLP é sempre o modelo salvo.**
+- **Os baselines:** KNN e regras servem de comparação.
+- **Por quê:** como o resultado não escolhe o modelo, a avaliação mede o MLP em vez de servir para escolhê-lo.
+- **Regras como fallback:** elas também funcionam sem modelo treinado.
+
+**CLIP só na indexação.**
+- **Onde roda:** o CLIP não roda no loop de frames.
+- **Cache:** os embeddings ficam em `data/cache/`, invalidados pelo hash da pasta `memes/` mais o nome do modelo. O app reindexa ao abrir se algo mudou.
+- **Atribuição:** cada meme vai para a classe de prompt mais similar (cosseno). O embedding da classe é a média de 4 templates.
+- **Por que o L-14:** o B-32 não diferencia gestos finos de mão (7/12). Como o CLIP não roda durante o uso, o modelo maior não custa FPS.
+
+## Limitações
+
+- **Uma pessoa só:** todas as sessões são do mesmo usuário. A acurácia em outras pessoas não foi medida.
+- **Mão fantasma:** o `HandLandmarker` às vezes detecta uma mão inexistente perto do ombro. Isso ocorreu em 41 frames de `mao_na_gravata` da `sessao_04`. O filtro está no [roadmap](docs/roadmap.md), porque um corte simples por distância também descartaria mãos reais.
+- **`min_similarity` não separa memes de imagens sem pessoa:** imagens sem pessoa pontuam de 0,145 a 0,197, e os memes de 0,178 a 0,240, então as faixas se sobrepõem. O limite de 0,16 só descarta ruído e formas simples. Uma "classe nula" está no roadmap.
+- **Sessão incompleta:** a `sessao_02` não tem as duas poses criadas depois dela (`maos_na_cabeca` e `mao_na_gravata`).
 
 ## Setup
 
-Requer Windows nativo (o WSL2 não acessa a webcam por padrão) e Python 3.11 ou 3.12.
+Requer Windows nativo (o WSL2 não acessa a webcam por padrão) e Python 3.11 ou 3.12. Tudo roda em CPU: o MediaPipe usa o delegate padrão de CPU, e o `torch` instalado pelo `requirements.txt` é a versão sem CUDA. Uma GPU, se houver, não é usada.
 
 ```powershell
 py -3.12 -m venv .venv
@@ -23,6 +137,8 @@ Invoke-WebRequest -Uri https://storage.googleapis.com/mediapipe-models/hand_land
 
 Para usar a pose `lite` ou `heavy`, troque `full` nos três pontos do primeiro comando e ajuste `tracker.model_variant` no `config.yaml`.
 
+O CLIP (cerca de 1,6 GB) é baixado sozinho na primeira indexação.
+
 ## Uso
 
 ```powershell
@@ -31,18 +147,18 @@ python main.py
 
 | Tecla | Ação |
 |---|---|
-| `q` | fecha o app |
+| `q` | fecha o app e imprime os tempos por etapa |
 | `s` | liga/desliga o esqueleto |
 
 ## Memes
 
-Coloque as imagens em `memes/` (`.png`, `.webp`, `.jpg` ou `.jpeg`). Cada uma vai para a pose de prompt mais parecido no `config.yaml`, pelo CLIP (`clip-ViT-L-14`), sem treino. O app reindexa sozinho ao abrir quando a pasta muda. Na primeira vez, baixa o modelo (cerca de 1,6 GB). Para ver a classe e a margem de cada meme:
+Coloque as imagens em `memes/` (`.png`, `.webp`, `.jpg` ou `.jpeg`). Cada uma vai para a pose de prompt mais parecido no `config.yaml`. O app reindexa sozinho ao abrir quando a pasta muda. Para ver a classe e a margem de cada meme:
 
 ```powershell
 python -m scripts.index_memes
 ```
 
-Se um meme cair na pose errada, corrija em `memes.overrides`, no `config.yaml`. Nos 12 memes do repositório, o CLIP acertou 9 sozinho, e os 3 erros perderam por menos de 0,01 de similaridade.
+Se um meme cair na pose errada, corrija em `memes.overrides`, no `config.yaml`. Uma margem pequena, perto de 0,01, indica que o CLIP ficou em dúvida entre duas classes.
 
 ## Treinar o classificador
 
@@ -74,6 +190,6 @@ O relatório sai em `reports/report.md`. Cada sessão é testada por um modelo q
 ## Testes
 
 ```powershell
-pytest -q                 # testes unitários
-pytest -m integration -q  # precisa do modelo baixado
+pytest -q                 # testes unitários: sem câmera, sem .task e sem baixar o CLIP
+pytest -m integration -q  # usa os modelos reais
 ```
