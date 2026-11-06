@@ -190,6 +190,22 @@ python -m scripts.train
 
 O relatório sai em `reports/report.md`. Cada sessão é testada por um modelo que não a viu, e o modelo salvo é treinado depois com todas elas.
 
+## Adicionar uma pose
+
+No Claude Code, rode `/nova-pose`. A skill (`.claude/skills/nova-pose/SKILL.md`) segue um checklist:
+
+1. registra a classe, o prompt e a tecla de coleta no `config.yaml`;
+2. confere se o meme novo caiu na classe certa e se nenhum meme antigo mudou de classe;
+3. pede as gravações;
+4. retreina;
+5. compara o modelo novo com o anterior:
+
+```powershell
+python -m scripts.compare_metrics data\cache\metrics_base.json
+```
+
+O comparador rejeita o modelo se alguma pose existente perder mais F1 que `training.max_class_f1_drop`, que é 0,05. Assim, uma pose nova não piora as antigas sem ninguém ver.
+
 ## Testes
 
 ```powershell

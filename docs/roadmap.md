@@ -4,13 +4,7 @@ Itens fora do escopo do MVP. Marque `[x]` quando implementado e mova para "Concl
 
 ## Prioridade alta
 
-- [ ] **Skill `/nova-pose`** (Claude): checklist reproduzível para adicionar uma pose:
-  1. adicionar classe e prompt textual no `config.yaml`;
-  2. coletar amostras em pelo menos duas sessões diferentes;
-  3. retreinar com split por sessão;
-  4. comparar métricas com o modelo anterior e rejeitar se alguma classe existente piorar além do tolerado;
-  5. reindexar memes;
-  6. atualizar a tabela de métricas no README.
+_(vazio)_
 
 ## Prioridade média
 
@@ -27,4 +21,5 @@ Itens fora do escopo do MVP. Marque `[x]` quando implementado e mova para "Concl
 
 ## Concluído
 
+- [x] **Skill `/nova-pose`** (2026-11-06): checklist em `.claude/skills/nova-pose/SKILL.md`. A comparação com o modelo anterior é feita pelo `scripts/compare_metrics.py`, que rejeita o modelo se alguma classe existente perder mais F1 que `training.max_class_f1_drop`.
 - [x] **Tabela de desempenho no README** (2026-11-06): tempo por etapa com `full` e `lite`; o tracking é o gargalo, e o `lite` não compensa porque as mãos rodam em paralelo com a pose.
