@@ -75,6 +75,7 @@ meme-pose/
 - Cada amostra carrega `session_id`. **Split de treino/teste sempre por sessão, nunca aleatório**: frames consecutivos são quase idênticos e o split aleatório vaza informação, inflando a acurácia.
 - Gravar sessões em condições diferentes (iluminação, roupa, distância).
 - Avaliação por **leave-one-session-out**: cada sessão é testada uma vez por um modelo que nunca a viu, e as métricas somam todas elas. O modelo salvo é treinado depois com todas as sessões.
+- Aumento por espelhamento (`training.mirror_augmentation`, via `features.mirror_features`) só nos dados de treino de cada fold e no modelo final. A sessão de teste é sempre avaliada como foi gravada.
 - `train.py` gera `classification_report`, matriz de confusão e comparação MLP vs KNN vs regras, salvos em `reports/`.
 - O modelo salvo é sempre o MLP; o KNN e as regras são baselines, então a avaliação mede o modelo em vez de escolhê-lo.
 

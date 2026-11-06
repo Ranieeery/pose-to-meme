@@ -29,12 +29,16 @@ Três sessões gravadas em dias diferentes, 7400 amostras. Cada sessão é testa
 
 | Classificador | Acurácia | F1 macro | Pior sessão | Meme indevido em `neutro` | Latência |
 |---|---|---|---|---|---|
-| **MLP** (o modelo salvo) | **0,874** | **0,872** | **0,791** | **0,157** | 0,34 ms |
-| KNN (baseline) | 0,764 | 0,767 | 0,707 | 0,263 | 0,78 ms |
+| **MLP** (o modelo salvo) | **0,922** | **0,921** | **0,872** | **0,165** | 0,30 ms |
+| KNN (baseline) | 0,813 | 0,813 | 0,764 | 0,198 | 2,30 ms |
 | Regras (baseline) | 0,720 | 0,688 | 0,673 | 0,255 | 0,03 ms |
 
+MLP e KNN treinam também com cópias espelhadas das sessões de treino (veja [Decisões](#decisões)).
+
 - **"Meme indevido em `neutro`"** é a fração de frames sem pose em que o app mostraria um meme, ou seja, o erro que o usuário mais percebe.
-- **As classes mais fracas** são `mao_na_gravata` (F1 0,75), que se confunde com `mao_no_ombro`, e `neutro`, com 73% de recall.
+- **As classes mais fracas** são:
+  - `garras_para_frente` (F1 0,80), que se confunde com `maos_abertas_para_frente`;
+  - `neutro` (F1 0,81), com 75% de recall.
 - **O relatório completo**, com a matriz de confusão por classificador, está em [reports/report.md](reports/report.md).
 
 **Por que três sessões:** com só duas, o MLP fazia 0,533 de acurácia e ficava abaixo das regras.
@@ -93,6 +97,19 @@ Medido só em CPU (a GPU não é usada), com uma câmera de 1280x720 a 30 FPS, r
   3. tudo é dividido pela distância entre os ombros.
 - **Associação das mãos:** cada mão vai para o punho da pose mais próximo, e não pelo rótulo esquerda/direita do modelo, que falha em frame espelhado.
 - **Mão não detectada:** não descarta a amostra. O vetor mantém o tamanho e leva um indicador de presença.
+
+**Aumento de dados por espelhamento, só no treino.**
+- **A ideia:** cada amostra de treino ganha uma cópia espelhada. O x muda de sinal e os pontos e mãos de um lado trocam com os do outro. Assim, uma pose gravada mais com a mão direita também ensina a esquerda.
+- **O cuidado:** só os dados de treino de cada fold são espelhados. A sessão de teste é avaliada como foi gravada, e nenhuma cópia dela entra no treino; um teste garante isso. A função `mirror_features` fica no `features.py`, que é o único lugar que conhece o layout do vetor.
+- **O efeito**, nas mesmas três sessões e nos mesmos frames de teste:
+
+  | | Sem espelhamento | Com espelhamento |
+  |---|---|---|
+  | Acurácia do MLP | 0,874 | 0,922 |
+  | Pior sessão | 0,791 | 0,872 |
+
+  - **Maiores ganhos:** foram nas poses de uma mão: `mao_na_gravata` (+0,16 de F1), `dedo_na_boca` (+0,14) e `sinal_de_rock` (+0,10).
+  - **O custo:** o meme indevido em `neutro` subiu de 0,157 para 0,165.
 
 **Pose e mãos em paralelo.** Em sequência, os dois modelos do MediaPipe passam do orçamento de um frame a 30 FPS.
 
