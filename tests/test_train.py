@@ -25,6 +25,7 @@ TRAINING = TrainingConfig(
     knn_neighbors=1,
     random_seed=0,
     min_sessions=2,
+    max_class_f1_drop=0.05,
 )
 RULES = RulesConfig(
     mouth_radius=0.4,
@@ -263,3 +264,11 @@ def test_metrics_cover_what_the_user_would_see(trained, field: str) -> None:
     _, _, metrics = trained
 
     assert field in metrics["classifiers"]["mlp"]
+
+
+def test_metrics_have_the_f1_of_each_class(trained) -> None:
+    _, _, metrics = trained
+
+    per_class = metrics["classifiers"]["mlp"]["per_class_f1"]
+    assert set(per_class) == set(metrics["samples_per_class"])
+    assert all(0.0 <= value <= 1.0 for value in per_class.values())

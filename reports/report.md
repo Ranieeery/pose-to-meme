@@ -14,9 +14,9 @@ Estas sessões distorcem as métricas. Classes ausentes:
 
 | Classificador | Acurácia | F1 macro | Pior sessão | Acurácia após threshold | Meme indevido em `neutro` | Latência (ms) |
 |---|---|---|---|---|---|---|
-| MLP | 0.874 | 0.872 | 0.791 | 0.838 | 0.157 | 0.288 |
-| KNN | 0.764 | 0.767 | 0.707 | 0.744 | 0.263 | 1.280 |
-| Regras | 0.720 | 0.688 | 0.673 | 0.720 | 0.255 | 0.026 |
+| MLP | 0.874 | 0.872 | 0.791 | 0.838 | 0.157 | 0.298 |
+| KNN | 0.764 | 0.767 | 0.707 | 0.744 | 0.263 | 1.096 |
+| Regras | 0.720 | 0.688 | 0.673 | 0.720 | 0.255 | 0.032 |
 
 ## Amostras por classe
 

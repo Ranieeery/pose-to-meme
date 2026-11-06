@@ -152,12 +152,19 @@ def _metrics(
     return {
         "accuracy": evaluation.accuracy,
         "macro_f1": float(f1_score(samples.labels, evaluation.predictions, average="macro", zero_division=0)),
+        "per_class_f1": _per_class_f1(samples, evaluation),
         "accuracy_after_threshold": float((accepted == samples.labels).mean()),
         "false_meme_rate": float((accepted[is_neutral] != neutral_class).mean()) if is_neutral.any() else None,
         "worst_session_accuracy": min(evaluation.per_session.values()),
         "per_session": evaluation.per_session,
         "latency_ms": latency_ms,
     }
+
+
+def _per_class_f1(samples: Samples, evaluation: SessionEvaluation) -> dict[str, float]:
+    labels = sorted(set(samples.labels))
+    scores = f1_score(samples.labels, evaluation.predictions, labels=labels, average=None, zero_division=0)
+    return {label: float(score) for label, score in zip(labels, scores, strict=True)}
 
 
 def _confusion_table(evaluation: SessionEvaluation, samples: Samples, labels: list[str]) -> str:

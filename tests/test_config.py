@@ -76,6 +76,7 @@ VALID: dict[str, Any] = {
         "knn_neighbors": 3,
         "random_seed": 1,
         "min_sessions": 3,
+        "max_class_f1_drop": 0.1,
     },
 }
 
@@ -302,6 +303,8 @@ def test_wrong_type_is_rejected(tmp_path: Path, section: str, key: str, value: A
         ("training", "max_iter", 0),
         ("training", "knn_neighbors", 0),
         ("training", "min_sessions", 1),
+        ("training", "max_class_f1_drop", -0.1),
+        ("training", "max_class_f1_drop", 1.1),
         ("ui", "quit_key", "quit"),
         ("ui", "quit_key", ""),
         ("ui", "skeleton_key", "ab"),

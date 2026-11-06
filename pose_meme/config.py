@@ -142,6 +142,7 @@ class TrainingConfig:
     knn_neighbors: int
     random_seed: int
     min_sessions: int
+    max_class_f1_drop: float  # how much an existing class may lose when a pose is added
 
 
 @dataclass(frozen=True)
@@ -277,6 +278,12 @@ def _validate(config: AppConfig) -> None:
         ("training.max_iter", training.max_iter, training.max_iter >= 1, ">= 1"),
         ("training.knn_neighbors", training.knn_neighbors, training.knn_neighbors >= 1, ">= 1"),
         ("training.min_sessions", training.min_sessions, training.min_sessions >= 2, ">= 2"),
+        (
+            "training.max_class_f1_drop",
+            training.max_class_f1_drop,
+            0 <= training.max_class_f1_drop <= 1,
+            "in [0, 1]",
+        ),
         ("hand_tracker.num_hands", hand.num_hands, hand.num_hands >= 1, ">= 1"),
         (
             "hand_tracker.min_detection_confidence",
