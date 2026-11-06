@@ -92,9 +92,11 @@ meme-pose/
 - O módulo recebe o encoder por **injeção de dependência**, para que testes usem um encoder falso sem baixar o CLIP.
 
 ### Renderização
-- Meme centralizado, altura ≈ 40% do frame (configurável), alpha blending usando o canal alpha (carregar com `cv2.IMREAD_UNCHANGED`). Imagens sem alpha são coladas opacas.
+- Janela em duas colunas: a câmera à esquerda, sem nada por cima além do esqueleto, e um painel à direita (largura configurável, proporcional à da câmera) com as informações em cima e o meme embaixo.
+- O meme ocupa o maior tamanho que cabe na área do painel, centralizado, com alpha blending sobre o fundo do painel (carregar com `cv2.IMREAD_UNCHANGED`). Imagens sem alpha são coladas opacas.
 - Imagens pré-carregadas e redimensionadas uma vez na inicialização.
-- HUD com FPS, pose atual e confiança; esqueleto desenhável on/off por tecla.
+- **Nada é esticado:** a janela tem tamanho fixo (redimensionar a janela no Windows estica a imagem). Se câmera + painel passarem de `ui.max_window_width`, a câmera é reduzida por igual nos dois eixos antes de montar o painel.
+- Painel com pose atual, confiança e FPS; esqueleto desenhável on/off por tecla.
 
 ### Desempenho
 - Orçamento por frame: tracking (pose + mãos) é o gargalo; classificação e render devem ser desprezíveis.
@@ -111,7 +113,7 @@ meme-pose/
   - `stabilizer`: não troca de pose por ruído de 1–2 frames; troca quando a maioria se sustenta.
   - Split por sessão: nenhuma `session_id` aparece em treino e teste ao mesmo tempo.
   - `meme_index`: atribuição correta com embeddings falsos; threshold mínimo; invalidação de cache quando a pasta muda.
-  - `renderer`: overlay centralizado, sem estourar bordas, frame de saída com mesmo shape, alpha aplicado corretamente.
+  - `renderer`: câmera intacta à esquerda, painel ao lado, meme centralizado na sua área sem estourar bordas, alpha aplicado corretamente.
   - Carregamento do `config.yaml` com valores padrão.
 
 ## Convenções

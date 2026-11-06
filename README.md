@@ -17,7 +17,7 @@ câmera → tracker → features → classificador → estabilizador → memes �
 | classificador | `pose_meme/classifier.py` | MLP do scikit-learn; regras geométricas quando não há modelo treinado |
 | estabilizador | `pose_meme/stabilizer.py` | a pose só muda quando uma classe domina 70% dos últimos 8 frames |
 | memes | `pose_meme/meme_index.py` | embeddings do CLIP calculados na indexação e guardados em cache; no loop, só uma consulta a um dicionário |
-| render | `pose_meme/renderer.py` | meme centralizado com alpha, esqueleto e HUD |
+| render | `pose_meme/renderer.py` | esqueleto sobre a câmera e painel ao lado, com pose, confiança e FPS em cima e o meme embaixo |
 
 O `main.py` só liga as etapas. Coleta (`scripts/collect.py`), treino (`scripts/train.py`) e app usam o mesmo `features.py`.
 
