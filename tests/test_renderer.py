@@ -4,7 +4,7 @@ import pytest
 from pose_meme.renderer import (
     HUD_LINE_HEIGHT,
     PANEL_COLOR,
-    compose_view,
+    ViewComposer,
     display_size,
     draw_body,
     draw_skeleton,
@@ -291,57 +291,112 @@ def test_tiny_frame_still_gives_a_meme_box() -> None:
     assert min(layout.meme_size) >= 1
 
 
-def compose(meme: np.ndarray | None, lines: list[str] | None = None) -> tuple[np.ndarray, np.ndarray]:
-    frame = np.full((*LAYOUT_FRAME, 3), 50, dtype=np.uint8)
-    layout = panel_layout(LAYOUT_FRAME, width_ratio=0.5, line_count=3)
-    return frame, compose_view(frame, layout, lines or [], meme)
+def composer(frame_size: tuple[int, int] = LAYOUT_FRAME, max_width: int = 10_000) -> ViewComposer:
+    return ViewComposer(frame_size, panel_width_ratio=0.5, max_width=max_width, line_count=3)
+
+
+def camera() -> np.ndarray:
+    return np.full((*LAYOUT_FRAME, 3), 50, dtype=np.uint8)
 
 
 def test_view_puts_the_camera_untouched_on_the_left_with_the_panel_beside_it() -> None:
-    frame, view = compose(None)
+    view = composer().compose(camera(), [], None)
 
     assert view.shape == (480, 640 + 320, 3)
-    assert np.array_equal(view[:, :640], frame)
+    assert np.array_equal(view[:, :640], camera())
 
 
-def test_panel_without_meme_or_text_is_plain_background() -> None:
-    _, view = compose(None)
+def panel_without_separator(chosen: ViewComposer, view: np.ndarray) -> np.ndarray:
+    return np.delete(view[:, 640:], chosen.layout.info_height, axis=0)
 
-    assert (view[:, 640:] == PANEL_COLOR).all()
+
+def test_panel_without_meme_or_text_is_plain_background_below_the_separator() -> None:
+    chosen = composer()
+
+    view = chosen.compose(camera(), [], None)
+
+    assert (panel_without_separator(chosen, view) == PANEL_COLOR).all()
+    assert (view[chosen.layout.info_height, 640 + chosen.layout.width // 2] != PANEL_COLOR).any()
 
 
 def test_info_text_goes_on_the_panel_top_not_on_the_camera() -> None:
-    frame, view = compose(None, ["Pose: neutro"])
+    chosen = composer()
 
-    assert np.array_equal(view[:, :640], frame)
-    lit_rows = np.nonzero((view[:, 640:] != PANEL_COLOR).any(axis=(1, 2)))[0]
+    view = chosen.compose(camera(), ["Pose: neutro"], None)
+
+    assert np.array_equal(view[:, :640], camera())
+    lit_rows = np.nonzero((panel_without_separator(chosen, view) != PANEL_COLOR).any(axis=(1, 2)))[0]
     assert lit_rows.max() < 3 * HUD_LINE_HEIGHT + HUD_LINE_HEIGHT
 
 
 def test_meme_is_centered_in_its_box_on_the_panel() -> None:
-    layout = panel_layout(LAYOUT_FRAME, width_ratio=0.5, line_count=3)
-    meme = fit_image(np.full((10, 10, 3), 200, dtype=np.uint8), layout.meme_size)
-    _, view = compose(meme)
+    chosen = composer()
+    meme = fit_image(np.full((10, 10, 3), 200, dtype=np.uint8), chosen.layout.meme_size)
 
-    top, left, height, width = layout.meme_box
+    view = chosen.compose(camera(), [], meme)
+
+    top, left, height, width = chosen.layout.meme_box
     assert view[top + height // 2, 640 + left + width // 2].tolist() == [200, 200, 200]
-    assert np.array_equal(view[:, :640], np.full((*LAYOUT_FRAME, 3), 50, dtype=np.uint8))
+    assert np.array_equal(view[:, :640], camera())
 
 
 def test_transparent_meme_shows_the_panel_background() -> None:
-    layout = panel_layout(LAYOUT_FRAME, width_ratio=0.5, line_count=3)
-    _, view = compose(fit_image(bgra(10, 10, (255, 255, 255), alpha=0), layout.meme_size))
+    chosen = composer()
 
-    assert (view[:, 640:] == PANEL_COLOR).all()
+    view = chosen.compose(camera(), [], fit_image(bgra(10, 10, (255, 255, 255), alpha=0), chosen.layout.meme_size))
+
+    assert (panel_without_separator(chosen, view) == PANEL_COLOR).all()
 
 
 def test_composing_does_not_change_the_camera_frame() -> None:
-    frame = np.full((*LAYOUT_FRAME, 3), 50, dtype=np.uint8)
-    layout = panel_layout(LAYOUT_FRAME, width_ratio=0.5, line_count=3)
+    frame = camera()
 
-    compose_view(frame, layout, ["text"], np.full((10, 10, 3), 200, dtype=np.uint8))
+    composer().compose(frame, ["text"], np.full((10, 10, 3), 200, dtype=np.uint8))
 
     assert (frame == 50).all()
+
+
+def test_text_of_the_previous_frame_does_not_linger() -> None:
+    chosen = composer()
+    expected = composer().compose(camera(), ["FPS: 1"], None).copy()
+
+    chosen.compose(camera(), ["Pose: garras_para_frente, a long line"], None)
+    view = chosen.compose(camera(), ["FPS: 1"], None)
+
+    assert np.array_equal(view, expected)
+
+
+def test_meme_change_replaces_the_panel_and_its_end_clears_it() -> None:
+    chosen = composer()
+    red = fit_image(np.full((10, 10, 3), (0, 0, 200), dtype=np.uint8), chosen.layout.meme_size)
+    blue = fit_image(np.full((10, 10, 3), (200, 0, 0), dtype=np.uint8), chosen.layout.meme_size)
+    top, left, height, width = chosen.layout.meme_box
+    center = (top + height // 2, 640 + left + width // 2)
+
+    assert chosen.compose(camera(), [], red)[center].tolist() == [0, 0, 200]
+    assert chosen.compose(camera(), [], blue)[center].tolist() == [200, 0, 0]
+    assert (panel_without_separator(chosen, chosen.compose(camera(), [], None)) == PANEL_COLOR).all()
+
+
+def test_camera_changes_reach_the_view_every_frame() -> None:
+    chosen = composer()
+    chosen.compose(camera(), [], None)
+
+    view = chosen.compose(np.full((*LAYOUT_FRAME, 3), 99, dtype=np.uint8), [], None)
+
+    assert (view[:, :640] == 99).all()
+
+
+def test_wide_camera_is_shrunk_evenly_to_fit_the_window() -> None:
+    chosen = composer(frame_size=(720, 1280), max_width=1440)
+
+    view = chosen.compose(np.full((720, 1280, 3), 70, dtype=np.uint8), [], None)
+
+    assert view.shape[1] <= 1440
+    height, width = chosen.camera_size
+    assert width / height == pytest.approx(1280 / 720, rel=0.01)
+    assert view.shape[0] == height
+    assert (view[:, :width] == 70).all()
 
 
 # --- the window never gets wider than the screen, and nothing is stretched ---

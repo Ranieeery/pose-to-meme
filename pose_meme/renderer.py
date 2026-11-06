@@ -141,31 +141,55 @@ def panel_layout(frame_size: tuple[int, int], width_ratio: float, line_count: in
     return PanelLayout(width, info_height, (top, left, box_height, box_width))
 
 
-def compose_view(
-    frame: np.ndarray,
-    layout: PanelLayout,
-    lines: Sequence[str],
-    meme: np.ndarray | None,
-) -> np.ndarray:
-    """The window image: the camera frame unchanged on the left, the panel on the right."""
-    frame_height, frame_width = frame.shape[:2]
-    view = np.empty((frame_height, frame_width + layout.width, 3), dtype=np.uint8)
-    view[:, :frame_width] = frame
-    panel = view[:, frame_width:]
-    panel[:] = PANEL_COLOR
-    if lines:
-        draw_text_lines(panel, lines, (PANEL_PADDING, PANEL_PADDING + HUD_LINE_HEIGHT - HUD_LINE_HEIGHT // 4))
+class ViewComposer:
+    """Builds the window image: the camera on the left, the panel on the right.
+
+    Built for speed, since it runs every frame: the view buffer is allocated once, and
+    the panel with its meme (the alpha blend is the costly part) is drawn only when
+    the meme changes. Each frame then copies the camera and redraws the text strip.
+    """
+
+    def __init__(self, frame_size: tuple[int, int], panel_width_ratio: float, max_width: int, line_count: int) -> None:
+        self.camera_size = display_size(frame_size, panel_width_ratio, max_width)
+        self.layout = panel_layout(self.camera_size, panel_width_ratio, line_count)
+        height, width = self.camera_size
+        self._view = np.empty((height, width + self.layout.width, 3), dtype=np.uint8)
+        self._camera = self._view[:, :width]
+        self._panel = self._view[:, width:]
+        self._shrunk = np.empty((height, width, 3), dtype=np.uint8)  # cv2.resize needs a contiguous target
+        self._panel_base = np.empty_like(self._panel)  # background + separator + meme, without text
+        self._text_rows = self.layout.meme_box[0]  # the text never reaches the meme box
+        self._meme: np.ndarray | None = None
+        self._draw_panel_base(None)
+
+    def compose(self, frame: np.ndarray, lines: Sequence[str], meme: np.ndarray | None) -> np.ndarray:
+        """Returns the same buffer every frame; it is only valid until the next call."""
+        if meme is not self._meme:
+            self._draw_panel_base(meme)
+        if frame.shape[:2] == self.camera_size:
+            self._camera[:] = frame
+        else:
+            height, width = self.camera_size
+            cv2.resize(frame, (width, height), dst=self._shrunk, interpolation=cv2.INTER_LINEAR)
+            self._camera[:] = self._shrunk
+        self._panel[: self._text_rows] = self._panel_base[: self._text_rows]
+        if lines:
+            draw_text_lines(self._panel, lines, (PANEL_PADDING, PANEL_PADDING + HUD_LINE_HEIGHT - HUD_LINE_HEIGHT // 4))
+        return self._view
+
+    def _draw_panel_base(self, meme: np.ndarray | None) -> None:
+        self._meme = meme
+        base = self._panel_base
+        base[:] = PANEL_COLOR
+        info_bottom = self.layout.info_height
         cv2.line(
-            panel,
-            (PANEL_PADDING, layout.info_height),
-            (layout.width - PANEL_PADDING, layout.info_height),
-            SEPARATOR_COLOR,
+            base, (PANEL_PADDING, info_bottom), (self.layout.width - PANEL_PADDING, info_bottom), SEPARATOR_COLOR,
             SEPARATOR_THICKNESS,
         )
-    if meme is not None:
-        top, left, height, width = layout.meme_box
-        overlay_centered(panel[top : top + height, left : left + width], meme)
-    return view
+        if meme is not None:
+            top, left, height, width = self.layout.meme_box
+            overlay_centered(base[top : top + height, left : left + width], meme)
+        self._panel[:] = base
 
 
 def overlay_centered(frame: np.ndarray, image: np.ndarray) -> None:
