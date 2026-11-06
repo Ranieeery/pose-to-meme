@@ -11,7 +11,7 @@ from pose_meme.capture import Camera, CameraError
 from pose_meme.classifier import ModelLoadError, classify_frame, load_classifier
 from pose_meme.config import AppConfig, ConfigError, load_config
 from pose_meme.features import extract_features
-from pose_meme.meme_index import MemeLoadError, MemeSelector, load_static_memes
+from pose_meme.meme_index import ClipEncoder, MemeLoadError, MemeSelector, group_by_pose, index_memes, load_memes
 from pose_meme.renderer import draw_body, draw_hud, overlay_centered
 from pose_meme.stabilizer import PoseStabilizer
 from pose_meme.timing import FpsCounter
@@ -36,11 +36,15 @@ def run(config: AppConfig) -> None:
     classifier = load_classifier(config.classifier.model_path, config.rules, neutral)
     print(f"classifier: {type(classifier).__name__}")
     stabilizer = PoseStabilizer(config.stabilizer.window_size, config.stabilizer.min_ratio, initial=neutral)
+    # CLIP loads only if the meme folder or the prompts changed since the last index.
+    matches = index_memes(config.memes, config.poses.prompts, lambda: ClipEncoder(config.memes.clip_model))
+    buckets = group_by_pose(matches)
+    print(f"memes: {sum(map(len, buckets.values()))} of {len(matches)} assigned to {len(buckets)} poses")
 
     with Camera(config.camera) as camera, create_body_tracker(config.tracker, config.hand_tracker) as tracker:
         frame = camera.read()
         height, width = frame.shape[:2]  # whatever the camera delivers, not what was requested
-        memes = load_static_memes(config.memes, (height, width), config.renderer.meme_height_ratio)
+        memes = load_memes(config.memes.dir, buckets, (height, width), config.renderer.meme_height_ratio)
         selector = MemeSelector(memes, neutral, random.Random())
 
         try:

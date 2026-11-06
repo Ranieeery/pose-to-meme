@@ -15,6 +15,7 @@ T = TypeVar("T")
 MODEL_VARIANTS = ("lite", "full", "heavy")
 MODEL_FILE_TEMPLATE = "pose_landmarker_{variant}.task"
 LONG_FINGERS = 4  # all but the thumb
+PROMPT_PLACEHOLDER = "{}"  # where each prompt template takes the class prompt
 
 
 class ConfigError(ValueError):
@@ -96,8 +97,9 @@ class MemesConfig:
     dir: Path
     cache_dir: Path
     clip_model: str
+    prompt_templates: list[str]
     min_similarity: float
-    static_map: dict[str, list[str]]
+    overrides: dict[str, str]  # meme file -> class, for when CLIP gets one wrong
 
 
 @dataclass(frozen=True)
@@ -201,23 +203,20 @@ def _parse_value(expected: Any, value: Any, where: str, base_dir: Path) -> Any:
     if expected is str:
         return _require(where, value, isinstance(value, str), "a string")
 
-    if get_origin(expected) is list:
+    if get_origin(expected) is list and get_args(expected)[0] is int:
         is_int_list = isinstance(value, list) and all(
             isinstance(item, int) and not isinstance(item, bool) for item in value
         )
         return _require(where, value, is_int_list, "a list of integers")
+    if get_origin(expected) is list:
+        is_text_list = isinstance(value, list) and all(isinstance(item, str) for item in value)
+        return _require(where, value, is_text_list, "a list of strings")
 
-    # The remaining annotations are dict[str, str] and dict[str, list[str]].
-    if get_args(expected)[1] is str:
-        is_text_mapping = isinstance(value, dict) and all(
-            isinstance(key, str) and isinstance(text, str) for key, text in value.items()
-        )
-        return _require(where, value, is_text_mapping, "a mapping of strings to strings")
-    is_list_mapping = isinstance(value, dict) and all(
-        isinstance(key, str) and isinstance(items, list) and all(isinstance(item, str) for item in items)
-        for key, items in value.items()
+    # The remaining annotation is dict[str, str].
+    is_text_mapping = isinstance(value, dict) and all(
+        isinstance(key, str) and isinstance(text, str) for key, text in value.items()
     )
-    return _require(where, value, is_list_mapping, "a mapping of strings to lists of strings")
+    return _require(where, value, is_text_mapping, "a mapping of strings to strings")
 
 
 def _require(where: str, value: Any, is_valid: bool, expected: str) -> Any:
@@ -228,7 +227,7 @@ def _require(where: str, value: Any, is_valid: bool, expected: str) -> Any:
 
 def _validate(config: AppConfig) -> None:
     camera, tracker, poses, ui = config.camera, config.tracker, config.poses, config.ui
-    rules, static_map, hand = config.rules, config.memes.static_map, config.hand_tracker
+    rules, memes, hand = config.rules, config.memes, config.hand_tracker
     collect, training = config.collect, config.training
     checks = [
         (
@@ -330,8 +329,19 @@ def _validate(config: AppConfig) -> None:
         ("rules.hands_together_max_gap", rules.hands_together_max_gap, rules.hands_together_max_gap > 0, "> 0"),
         ("rules.head_min_height", rules.head_min_height, rules.head_min_height > 0, "> 0"),
         ("rules.head_half_width", rules.head_half_width, rules.head_half_width > 0, "> 0"),
-        ("memes.static_map", static_map, static_map.keys() <= poses.prompts.keys(), "only classes in poses.prompts"),
-        ("memes.static_map", static_map, all(static_map.values()), "at least one file per class"),
+        (
+            "memes.overrides",
+            memes.overrides,
+            set(memes.overrides.values()) <= poses.prompts.keys(),
+            "only classes in poses.prompts",
+        ),
+        ("memes.prompt_templates", memes.prompt_templates, bool(memes.prompt_templates), "not empty"),
+        (
+            "memes.prompt_templates",
+            memes.prompt_templates,
+            all(template.count(PROMPT_PLACEHOLDER) == 1 for template in memes.prompt_templates),
+            f"each with exactly one {PROMPT_PLACEHOLDER} for the class prompt",
+        ),
         ("ui.quit_key", ui.quit_key, len(ui.quit_key) == 1, "a single character"),
         ("ui.skeleton_key", ui.skeleton_key, len(ui.skeleton_key) == 1, "a single character"),
         ("ui.skeleton_key", ui.skeleton_key, ui.skeleton_key != ui.quit_key, "different from ui.quit_key"),
@@ -357,7 +367,7 @@ def _validate(config: AppConfig) -> None:
             poses.neutral_class not in poses.prompts,
             "absent from poses.prompts",
         ),
-        ("memes.min_similarity", config.memes.min_similarity, -1 <= config.memes.min_similarity <= 1, "in [-1, 1]"),
+        ("memes.min_similarity", memes.min_similarity, -1 <= memes.min_similarity <= 1, "in [-1, 1]"),
         (
             "renderer.meme_height_ratio",
             config.renderer.meme_height_ratio,

@@ -49,7 +49,8 @@ VALID: dict[str, Any] = {
         "cache_dir": "cache",
         "clip_model": "fake",
         "min_similarity": 0.1,
-        "static_map": {"maos_na_cabeca": ["a.png", "b.png"]},
+        "prompt_templates": ["a person {}", "a photo of someone {}"],
+        "overrides": {"a.png": "maos_na_cabeca"},
     },
     "renderer": {"meme_height_ratio": 0.5, "show_skeleton": False},
     "data": {"samples_dir": "samples", "reports_dir": "out"},
@@ -109,16 +110,14 @@ def test_repo_config_has_the_documented_defaults() -> None:
         "maos_na_cabeca",
         "mao_na_gravata",
     }
-    assert config.memes.clip_model == "clip-ViT-B-32"
+    assert config.memes.clip_model == "clip-ViT-L-14"
     assert config.renderer.meme_height_ratio == 0.4
     assert config.ui.quit_key == "q"
     assert config.training.min_sessions >= 2
     assert all(isinstance(size, int) for size in config.training.hidden_layers)
     assert config.hand_tracker.num_hands == 2
     assert config.hand_tracker.model_path == REPO_CONFIG.parent / "models" / "hand_landmarker.task"
-    assert set(config.memes.static_map) == set(config.poses.prompts)
-    mapped = {name for names in config.memes.static_map.values() for name in names}
-    assert all((config.memes.dir / name).is_file() for name in mapped)
+    assert all((config.memes.dir / name).is_file() for name in config.memes.overrides)
 
 
 def test_values_are_loaded_into_typed_sections(tmp_path: Path) -> None:
@@ -222,8 +221,10 @@ def test_unknown_key_is_rejected_to_catch_typos(tmp_path: Path) -> None:
         ("memes", "clip_model", 3),
         ("poses", "prompts", "hands on head"),
         ("poses", "prompts", {"maos_na_cabeca": 1}),
-        ("memes", "static_map", {"maos_na_cabeca": "a.png"}),
-        ("memes", "static_map", {"maos_na_cabeca": [1]}),
+        ("memes", "prompt_templates", "a person {}"),
+        ("memes", "prompt_templates", [1]),
+        ("memes", "overrides", ["a.png"]),
+        ("memes", "overrides", {"a.png": 1}),
         ("training", "hidden_layers", 8),
         ("training", "hidden_layers", ["8"]),
         ("training", "hidden_layers", [True]),
@@ -272,8 +273,11 @@ def test_wrong_type_is_rejected(tmp_path: Path, section: str, key: str, value: A
         ("rules", "hands_together_max_gap", 0),
         ("rules", "head_min_height", 0),
         ("rules", "head_half_width", 0),
-        ("memes", "static_map", {"unknown_pose": ["a.png"]}),
-        ("memes", "static_map", {"maos_na_cabeca": []}),
+        ("memes", "prompt_templates", []),
+        ("memes", "prompt_templates", ["a person"]),  # no {} for the class prompt
+        ("memes", "prompt_templates", ["{} and {}"]),
+        ("memes", "overrides", {"a.png": "unknown_pose"}),
+        ("memes", "overrides", {"a.png": "neutro"}),  # the neutral class shows no meme
         ("collect", "samples_per_class", 0),
         ("collect", "sample_every", 0),
         ("collect", "countdown_seconds", -1),
@@ -311,7 +315,7 @@ def test_prompts_cannot_be_empty(tmp_path: Path) -> None:
 def test_more_classes_than_collect_keys_are_rejected(tmp_path: Path) -> None:
     prompts = {f"pose_{index}": "prompt" for index in range(4)}  # plus the neutral class: 5 for 4 keys
     data = with_value("poses", "prompts", prompts)
-    data["memes"]["static_map"] = {}
+    data["memes"]["overrides"] = {}
 
     with pytest.raises(ConfigError, match=r"collect\.class_keys"):
         load_config(write_config(tmp_path, data))

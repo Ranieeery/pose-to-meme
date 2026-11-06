@@ -51,37 +51,39 @@ stabilizer:
 poses:
   neutral_class: neutro # never shows a meme, so it has no prompt
   prompts:
-    mao_fechada_na_boca: "a person with curled fingers bunched against their mouth, as if eating"
-    mao_aberta_na_boca: "a person holding an open hand in front of their mouth, showing their fingernails"
-    maos_unidas: "a person with both palms pressed together in front of their face, as if praying"
-    dedo_levantado: "a person raising one index finger in the air, making a point"
-    apontando_para_si: "a person pointing a finger at their own face, asking who, me?"
-    sinal_de_rock: "a person making the rock and roll devil horns hand sign"
-    maos_abertas_para_frente: "a person reaching both open hands toward the camera with fingers spread wide"
-    garras_para_frente: "a person reaching toward the camera with curled fingers like claws, screaming"
-    mao_no_ombro: "a person with one hand across their body, holding their opposite shoulder or upper arm"
-    dedo_na_boca: "a person thoughtfully touching their lips with one finger"
-    maos_na_cabeca: "a person screaming with their mouth open and both hands on their head"
-    mao_na_gravata: "a smiling person in a suit adjusting their tie or lapel with one hand on their chest"
+    mao_fechada_na_boca: "with curled fingers bunched against their mouth, as if eating"
+    mao_aberta_na_boca: "holding an open hand in front of their mouth, showing their fingernails"
+    maos_unidas: "with both palms pressed together in front of their face, as if praying"
+    dedo_levantado: "raising one index finger in the air, making a point"
+    apontando_para_si: "pointing a finger at their own face, asking who, me?"
+    sinal_de_rock: "making the rock and roll devil horns hand sign"
+    maos_abertas_para_frente: "reaching both open hands toward the camera with fingers spread wide"
+    garras_para_frente: "reaching toward the camera with curled fingers like claws, screaming"
+    mao_no_ombro: "with one hand across their body, holding their opposite shoulder or upper arm"
+    dedo_na_boca: "thoughtfully touching their lips with one finger"
+    maos_na_cabeca: "screaming with their mouth open and both hands on their head"
+    mao_na_gravata: "smiling in a suit, adjusting their tie or lapel with one hand on their chest"
 
 memes:
   dir: memes
   cache_dir: data/cache
-  clip_model: clip-ViT-B-32
-  min_similarity: 0.2 # provisional; calibrate against real memes in M4
-  static_map: # temporary; CLIP matching replaces it in M4
-    mao_fechada_na_boca: [bebe-pensativo.webp]
-    dedo_na_boca: [macaco-dedo-boca.webp]
-    maos_na_cabeca: [aaaaaaaaaaaaaa.jpg]
-    mao_na_gravata: [trajado.jpg]
-    mao_aberta_na_boca: [maria-joaquina-unha.webp]
-    maos_unidas: [bjork-pose.jpg]
-    dedo_levantado: [lily-nerd.webp]
-    apontando_para_si: [ryujin-eu.webp]
-    sinal_de_rock: [licurgo-rock.webp]
-    maos_abertas_para_frente: [numetal-pose.jpg]
-    garras_para_frente: [ozzy-osbourne.jpg]
-    mao_no_ombro: [valverde-pose.webp]
+  # Offline only (indexing), so its size never touches the frame loop. Of the 12 repo memes,
+  # B-32 got 7 right and L-14 with the templates below 9 to 11: its misses lose by < 0.01,
+  # small enough that batching the prompts differently flips them.
+  clip_model: clip-ViT-L-14
+  # Each class prompt fills the {} of every template; the class embedding is their mean.
+  prompt_templates:
+    - "a person {}"
+    - "a photo of a person {}"
+    - "a meme of a person {}"
+    - "a close-up photo of someone {}"
+  # Real memes scored 0.178-0.240 and images with no person 0.145-0.197: the ranges overlap,
+  # so this only drops what scores below every real meme (noise, plain shapes).
+  min_similarity: 0.16
+  overrides: # meme file -> class, only where CLIP gets one wrong (see python -m scripts.index_memes)
+    maria-joaquina-unha.webp: mao_aberta_na_boca # CLIP: dedo_na_boca
+    ozzy-osbourne.jpg: garras_para_frente # CLIP: sinal_de_rock
+    trajado.jpg: mao_na_gravata # CLIP: mao_no_ombro
 
 renderer:
   meme_height_ratio: 0.4 # share of the frame height
