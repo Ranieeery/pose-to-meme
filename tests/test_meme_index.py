@@ -148,10 +148,10 @@ def test_pose_without_memes_shows_nothing() -> None:
 # --- loading images for the overlay ---
 
 
-def test_memes_load_resized_for_the_frame(tmp_path: Path) -> None:
+def test_memes_load_resized_for_their_box(tmp_path: Path) -> None:
     write_image(tmp_path / "a.png")
 
-    memes = load_memes(tmp_path, {"pose": ["a.png"]}, (480, 640), height_ratio=0.5)
+    memes = load_memes(tmp_path, {"pose": ["a.png"]}, box_size=(240, 640))
 
     assert memes["pose"][0].shape[:2] == (240, 480)
 
@@ -160,31 +160,31 @@ def test_memes_load_resized_for_the_frame(tmp_path: Path) -> None:
 def test_accepted_formats_load(tmp_path: Path, name: str) -> None:
     write_image(tmp_path / name)
 
-    assert len(load_memes(tmp_path, {"pose": [name]}, (100, 100), 0.5)["pose"]) == 1
+    assert len(load_memes(tmp_path, {"pose": [name]}, (50, 100))["pose"]) == 1
 
 
 def test_path_with_accents_loads(tmp_path: Path) -> None:
     write_image(tmp_path / "pensativo-ção.png")
 
-    assert len(load_memes(tmp_path, {"pose": ["pensativo-ção.png"]}, (100, 100), 0.5)["pose"]) == 1
+    assert len(load_memes(tmp_path, {"pose": ["pensativo-ção.png"]}, (50, 100))["pose"]) == 1
 
 
 def test_alpha_channel_is_preserved(tmp_path: Path) -> None:
     write_image(tmp_path / "a.png", channels=4)
 
-    assert load_memes(tmp_path, {"pose": ["a.png"]}, (100, 100), 0.5)["pose"][0].shape[2] == 4
+    assert load_memes(tmp_path, {"pose": ["a.png"]}, (50, 100))["pose"][0].shape[2] == 4
 
 
 def test_missing_file_is_a_clear_error(tmp_path: Path) -> None:
     with pytest.raises(MemeLoadError, match="nope.png"):
-        load_memes(tmp_path, {"pose": ["nope.png"]}, (100, 100), 0.5)
+        load_memes(tmp_path, {"pose": ["nope.png"]}, (50, 100))
 
 
 def test_unreadable_file_is_a_clear_error(tmp_path: Path) -> None:
     (tmp_path / "broken.png").write_bytes(b"not an image")
 
     with pytest.raises(MemeLoadError, match="broken.png"):
-        load_memes(tmp_path, {"pose": ["broken.png"]}, (100, 100), 0.5)
+        load_memes(tmp_path, {"pose": ["broken.png"]}, (50, 100))
 
 
 # --- which files are memes ---

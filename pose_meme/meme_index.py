@@ -19,7 +19,7 @@ import cv2
 import numpy as np
 
 from pose_meme.config import PROMPT_PLACEHOLDER, MemesConfig
-from pose_meme.renderer import fit_overlay
+from pose_meme.renderer import fit_image
 
 logger = logging.getLogger(__name__)
 
@@ -265,12 +265,11 @@ class ClipEncoder:
 def load_memes(
     directory: Path,
     buckets: Mapping[str, Sequence[str]],
-    frame_size: tuple[int, int],
-    height_ratio: float,
+    box_size: tuple[int, int],
 ) -> dict[str, list[np.ndarray]]:
-    """Load and resize every assigned meme once, so the frame loop never touches the disk."""
+    """Load and resize every assigned meme once to its panel box, so the frame loop never touches the disk."""
     return {
-        pose: [fit_overlay(_read_image(directory / name), frame_size, height_ratio) for name in names]
+        pose: [fit_image(_read_image(directory / name), box_size) for name in names]
         for pose, names in buckets.items()
     }
 

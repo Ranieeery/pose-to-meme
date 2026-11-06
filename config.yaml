@@ -86,7 +86,7 @@ memes:
     trajado.jpg: mao_na_gravata # CLIP: mao_no_ombro
 
 renderer:
-  meme_height_ratio: 0.4 # share of the frame height
+  panel_width_ratio: 0.5 # side panel (info on top, meme below), as a share of the camera width
   show_skeleton: true
 
 data:
@@ -99,6 +99,7 @@ ui:
   skeleton_key: s
   fps_window: 30 # frames averaged by the FPS counter
   timing_warmup_frames: 60 # left out of the per-stage times printed on exit
+  max_window_width: 1600 # pixels; camera + panel shrink evenly to fit, never stretched
 
 collect:
   samples_per_class: 200 # per session; recording stops by itself here

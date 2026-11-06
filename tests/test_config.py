@@ -52,7 +52,7 @@ VALID: dict[str, Any] = {
         "prompt_templates": ["a person {}", "a photo of someone {}"],
         "overrides": {"a.png": "maos_na_cabeca"},
     },
-    "renderer": {"meme_height_ratio": 0.5, "show_skeleton": False},
+    "renderer": {"panel_width_ratio": 0.4, "show_skeleton": False},
     "data": {"samples_dir": "samples", "reports_dir": "out"},
     "ui": {
         "window_title": "test",
@@ -60,6 +60,7 @@ VALID: dict[str, Any] = {
         "skeleton_key": "y",
         "fps_window": 5,
         "timing_warmup_frames": 2,
+        "max_window_width": 800,
     },
     "collect": {
         "samples_per_class": 10,
@@ -117,7 +118,7 @@ def test_repo_config_has_the_documented_defaults() -> None:
         "mao_na_gravata",
     }
     assert config.memes.clip_model == "clip-ViT-L-14"
-    assert config.renderer.meme_height_ratio == 0.4
+    assert config.renderer.panel_width_ratio == 0.5
     assert config.ui.quit_key == "q"
     assert config.training.min_sessions >= 2
     assert all(isinstance(size, int) for size in config.training.hidden_layers)
@@ -256,8 +257,8 @@ def test_wrong_type_is_rejected(tmp_path: Path, section: str, key: str, value: A
         ("stabilizer", "min_ratio", 1.1),
         ("memes", "min_similarity", 1.5),
         ("memes", "min_similarity", -1.5),
-        ("renderer", "meme_height_ratio", 0),
-        ("renderer", "meme_height_ratio", 1.1),
+        ("renderer", "panel_width_ratio", 0),
+        ("renderer", "panel_width_ratio", 2.1),
         ("hand_tracker", "num_hands", 0),
         ("hand_tracker", "min_detection_confidence", 1.5),
         ("hand_tracker", "min_presence_confidence", -0.1),
@@ -307,6 +308,7 @@ def test_wrong_type_is_rejected(tmp_path: Path, section: str, key: str, value: A
         ("ui", "skeleton_key", "x"),  # same key as quit_key
         ("ui", "fps_window", 1),
         ("ui", "timing_warmup_frames", -1),
+        ("ui", "max_window_width", 0),
     ],
 )
 def test_out_of_range_value_is_rejected(tmp_path: Path, section: str, key: str, value: Any) -> None:

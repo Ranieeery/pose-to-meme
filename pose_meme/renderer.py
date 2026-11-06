@@ -1,7 +1,9 @@
-"""Drawing on the video frame. Functions draw in place, to avoid copying each frame."""
+"""Drawing: skeleton on the camera frame, and the view with a side panel for info and meme.
+
+Skeleton and text functions draw in place, to avoid copying each frame."""
 
 from collections.abc import Iterable, Sequence
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
 import cv2
@@ -25,6 +27,10 @@ HUD_FONT = cv2.FONT_HERSHEY_SIMPLEX
 HUD_SCALE = 0.7
 HUD_THICKNESS = 2
 HUD_OUTLINE_THICKNESS = 4
+PANEL_COLOR = (40, 40, 40)
+PANEL_PADDING = 12
+SEPARATOR_COLOR = (90, 90, 90)
+SEPARATOR_THICKNESS = 1
 
 MAX_ALPHA = 255.0
 BGRA_CHANNELS = 4
@@ -79,26 +85,87 @@ def draw_body(
         draw_skeleton(frame, hand, hand_connections, min_visibility)
 
 
-def draw_hud(frame: np.ndarray, fps: float, pose: str, confidence: float) -> None:
-    draw_text_lines(frame, [f"FPS: {fps:.1f}", f"Pose: {pose}", f"Confianca: {confidence:.2f}"])
+def info_lines(fps: float, pose: str, confidence: float) -> list[str]:
+    """What the panel shows above the meme; always the same number of lines."""
+    return [f"Pose: {pose}", f"Confianca: {confidence:.2f}", f"FPS: {fps:.1f}"]
 
 
-def draw_text_lines(frame: np.ndarray, lines: Sequence[str]) -> None:
-    """Outlined text from the top left corner; cv2 fonts have no accented characters."""
-    x, y = HUD_ORIGIN
+def draw_text_lines(frame: np.ndarray, lines: Sequence[str], origin: tuple[int, int] = HUD_ORIGIN) -> None:
+    """Outlined text going down from origin; cv2 fonts have no accented characters."""
+    x, y = origin
     for number, text in enumerate(lines):
-        origin = (x, y + number * HUD_LINE_HEIGHT)
-        cv2.putText(frame, text, origin, HUD_FONT, HUD_SCALE, HUD_OUTLINE_COLOR, HUD_OUTLINE_THICKNESS, cv2.LINE_AA)
-        cv2.putText(frame, text, origin, HUD_FONT, HUD_SCALE, HUD_COLOR, HUD_THICKNESS, cv2.LINE_AA)
+        position = (x, y + number * HUD_LINE_HEIGHT)
+        cv2.putText(frame, text, position, HUD_FONT, HUD_SCALE, HUD_OUTLINE_COLOR, HUD_OUTLINE_THICKNESS, cv2.LINE_AA)
+        cv2.putText(frame, text, position, HUD_FONT, HUD_SCALE, HUD_COLOR, HUD_THICKNESS, cv2.LINE_AA)
 
 
-def fit_overlay(image: np.ndarray, frame_size: tuple[int, int], height_ratio: float) -> np.ndarray:
-    """Resize an image to its display size, keeping proportions and within the frame width."""
-    frame_height, frame_width = frame_size
+def fit_image(image: np.ndarray, box_size: tuple[int, int]) -> np.ndarray:
+    """Resize an image to the largest size that fits the box, keeping its proportions."""
+    box_height, box_width = box_size
     height, width = image.shape[:2]
-    scale = min(frame_height * height_ratio / height, frame_width / width)
+    scale = min(box_height / height, box_width / width)
     new_size = (max(1, round(width * scale)), max(1, round(height * scale)))
     return cv2.resize(image, new_size, interpolation=cv2.INTER_AREA)
+
+
+@dataclass(frozen=True)
+class PanelLayout:
+    """The panel beside the camera, in panel coordinates: info lines on top, meme box below."""
+
+    width: int
+    info_height: int
+    meme_box: tuple[int, int, int, int]  # top, left, height, width
+
+    @property
+    def meme_size(self) -> tuple[int, int]:
+        return self.meme_box[2], self.meme_box[3]
+
+
+def display_size(frame_size: tuple[int, int], width_ratio: float, max_width: int) -> tuple[int, int]:
+    """Camera size on screen: shrunk by the same factor on both axes when camera + panel
+    would be wider than max_width, so the window never needs resizing (which stretches)."""
+    frame_height, frame_width = frame_size
+    scale = min(1.0, max_width / (frame_width * (1 + width_ratio)))
+    return max(1, int(frame_height * scale)), max(1, int(frame_width * scale))
+
+
+def panel_layout(frame_size: tuple[int, int], width_ratio: float, line_count: int) -> PanelLayout:
+    """Computed once from the camera's real size, since nothing may assume a fixed one."""
+    frame_height, frame_width = frame_size
+    width = max(1, round(frame_width * width_ratio))
+    info_height = PANEL_PADDING + line_count * HUD_LINE_HEIGHT
+    top = min(info_height + PANEL_PADDING, frame_height - 1)
+    box_height = max(1, frame_height - top - PANEL_PADDING)
+    left = min(PANEL_PADDING, width - 1)
+    box_width = max(1, width - 2 * PANEL_PADDING)
+    return PanelLayout(width, info_height, (top, left, box_height, box_width))
+
+
+def compose_view(
+    frame: np.ndarray,
+    layout: PanelLayout,
+    lines: Sequence[str],
+    meme: np.ndarray | None,
+) -> np.ndarray:
+    """The window image: the camera frame unchanged on the left, the panel on the right."""
+    frame_height, frame_width = frame.shape[:2]
+    view = np.empty((frame_height, frame_width + layout.width, 3), dtype=np.uint8)
+    view[:, :frame_width] = frame
+    panel = view[:, frame_width:]
+    panel[:] = PANEL_COLOR
+    if lines:
+        draw_text_lines(panel, lines, (PANEL_PADDING, PANEL_PADDING + HUD_LINE_HEIGHT - HUD_LINE_HEIGHT // 4))
+        cv2.line(
+            panel,
+            (PANEL_PADDING, layout.info_height),
+            (layout.width - PANEL_PADDING, layout.info_height),
+            SEPARATOR_COLOR,
+            SEPARATOR_THICKNESS,
+        )
+    if meme is not None:
+        top, left, height, width = layout.meme_box
+        overlay_centered(panel[top : top + height, left : left + width], meme)
+    return view
 
 
 def overlay_centered(frame: np.ndarray, image: np.ndarray) -> None:

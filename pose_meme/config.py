@@ -15,6 +15,7 @@ T = TypeVar("T")
 MODEL_VARIANTS = ("lite", "full", "heavy")
 MODEL_FILE_TEMPLATE = "pose_landmarker_{variant}.task"
 LONG_FINGERS = 4  # all but the thumb
+MAX_PANEL_WIDTH_RATIO = 2  # wider than twice the camera would dwarf it
 PROMPT_PLACEHOLDER = "{}"  # where each prompt template takes the class prompt
 
 
@@ -104,7 +105,7 @@ class MemesConfig:
 
 @dataclass(frozen=True)
 class RendererConfig:
-    meme_height_ratio: float
+    panel_width_ratio: float  # side panel width, as a share of the camera frame width
     show_skeleton: bool
 
 
@@ -121,6 +122,7 @@ class UiConfig:
     skeleton_key: str
     fps_window: int
     timing_warmup_frames: int
+    max_window_width: int  # camera + panel shrink together to fit it
 
 
 @dataclass(frozen=True)
@@ -348,6 +350,7 @@ def _validate(config: AppConfig) -> None:
         ("ui.skeleton_key", ui.skeleton_key, ui.skeleton_key != ui.quit_key, "different from ui.quit_key"),
         ("ui.fps_window", ui.fps_window, ui.fps_window >= 2, ">= 2"),
         ("ui.timing_warmup_frames", ui.timing_warmup_frames, ui.timing_warmup_frames >= 0, ">= 0"),
+        ("ui.max_window_width", ui.max_window_width, ui.max_window_width > 0, "> 0"),
         ("camera.index", camera.index, camera.index >= 0, ">= 0"),
         ("camera.width", camera.width, camera.width > 0, "> 0"),
         ("camera.height", camera.height, camera.height > 0, "> 0"),
@@ -371,10 +374,10 @@ def _validate(config: AppConfig) -> None:
         ),
         ("memes.min_similarity", memes.min_similarity, -1 <= memes.min_similarity <= 1, "in [-1, 1]"),
         (
-            "renderer.meme_height_ratio",
-            config.renderer.meme_height_ratio,
-            0 < config.renderer.meme_height_ratio <= 1,
-            "in (0, 1]",
+            "renderer.panel_width_ratio",
+            config.renderer.panel_width_ratio,
+            0 < config.renderer.panel_width_ratio <= MAX_PANEL_WIDTH_RATIO,
+            f"in (0, {MAX_PANEL_WIDTH_RATIO}]",
         ),
     ]
     for where, value, is_valid, expected in checks:

@@ -12,7 +12,7 @@ from pose_meme.classifier import ModelLoadError, classify_frame, load_classifier
 from pose_meme.config import AppConfig, ConfigError, load_config
 from pose_meme.features import extract_features
 from pose_meme.meme_index import ClipEncoder, MemeLoadError, MemeSelector, group_by_pose, index_memes, load_memes
-from pose_meme.renderer import draw_body, draw_hud, overlay_centered
+from pose_meme.renderer import compose_view, display_size, draw_body, info_lines, panel_layout
 from pose_meme.stabilizer import PoseStabilizer
 from pose_meme.timing import FpsCounter, StageTimer, format_stats
 from pose_meme.tracker import (
@@ -45,7 +45,10 @@ def run(config: AppConfig) -> None:
     with Camera(config.camera) as camera, create_body_tracker(config.tracker, config.hand_tracker) as tracker:
         frame = camera.read()
         height, width = frame.shape[:2]  # whatever the camera delivers, not what was requested
-        memes = load_memes(config.memes.dir, buckets, (height, width), config.renderer.meme_height_ratio)
+        panel_ratio = config.renderer.panel_width_ratio
+        shown_height, shown_width = display_size((height, width), panel_ratio, config.ui.max_window_width)
+        layout = panel_layout((shown_height, shown_width), panel_ratio, len(info_lines(0.0, neutral, 0.0)))
+        memes = load_memes(config.memes.dir, buckets, layout.meme_size)
         selector = MemeSelector(memes, neutral, random.Random())
 
         try:
@@ -72,11 +75,11 @@ def run(config: AppConfig) -> None:
                 with timer.measure("render"):
                     if show_skeleton:
                         draw_body(frame, body.pose, body.hands, POSE_CONNECTIONS, HAND_CONNECTIONS, min_visibility)
-                    if meme is not None:
-                        overlay_centered(frame, meme)
-                    draw_hud(frame, fps.fps, pose, confidence)
+                    if (shown_height, shown_width) != (height, width):
+                        frame = cv2.resize(frame, (shown_width, shown_height), interpolation=cv2.INTER_AREA)
+                    view = compose_view(frame, layout, info_lines(fps.fps, pose, confidence), meme)
                 with timer.measure("display"):  # imshow + waitKey
-                    cv2.imshow(title, frame)
+                    cv2.imshow(title, view)
                     key = cv2.waitKey(KEY_WAIT_MS) & KEY_MASK
                 timer.end_frame()
 
